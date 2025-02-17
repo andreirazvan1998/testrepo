@@ -63,11 +63,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Add Reviewers to PR
-        if: success() && env.PR_EXISTS == 'false'  # Only if the tests pass and the PR didn't exist and we can add more reviewers add one more -request-reviewer <reviewer>
+        if: success() && env.PR_EXISTS == 'false'  # Only if the tests pass and the PR didn't exist
         run: |
           PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
           # Add reviewers (replace with the GitHub usernames of the reviewers)
-          gh pr review "$PR_URL" --request-reviewer RadiCarolAlin     
+          gh pr edit "$PR_URL" --add-reviewer RadiCarolAlin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
