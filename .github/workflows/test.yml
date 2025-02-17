@@ -58,7 +58,7 @@ jobs:
         run: |
           # If PR was created as draft, convert it to open
           PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
-          gh pr ready --ready "$PR_URL"
+          gh pr ready "$PR_URL"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -66,6 +66,6 @@ jobs:
         if: env.PR_EXISTS == 'true' && success()  # Only run if PR exists and tests passed
         run: |
           echo "Tests passed, converting the PR to open"
-          gh pr ready --ready "$PR_URL"
+          gh pr ready "$PR_URL"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
