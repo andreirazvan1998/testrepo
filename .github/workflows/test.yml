@@ -30,7 +30,7 @@ jobs:
         id: create_pr
         run: |
           gh pr create -B main -H test1 --title 'Merge branch_to_merge into base_branch' --body 'Created by Github action'
-          echo "PR_URL=$(gh pr view --json url -q .url)" >> $GITHUB_ENV
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
