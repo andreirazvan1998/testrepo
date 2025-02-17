@@ -31,7 +31,6 @@ jobs:
         run: pytest test_script.py
 
       - name: Create Pull Request
-        permissions: pull-requests: write
         id: create_pr
         run: |
           gh pr create -B main -H test1 --title 'Merge branch_to_merge into base_branch' --body 'Created by Github action'
