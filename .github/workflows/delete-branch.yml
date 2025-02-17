@@ -1,0 +1,22 @@
+name: Delete Merged Branch
+
+on:
+  pull_request:
+    types:
+      - closed  # Triggers when a PR is closed (merged or manually closed)
+
+permissions:
+  contents: write
+
+jobs:
+  delete_branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Branch After Merge
+        if: github.event.pull_request.merged == true  # Only delete if PR was merged
+        run: |
+          BRANCH_NAME=${{ github.event.pull_request.head.ref }}
+          echo "Deleting branch $BRANCH_NAME"
+          git push origin --delete $BRANCH_NAME
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
