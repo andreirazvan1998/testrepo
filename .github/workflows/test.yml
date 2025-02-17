@@ -30,18 +30,37 @@ jobs:
         id: pytest
         run: pytest test_script.py
 
-      - name: Create Pull Request
-        id: create_pr
+      - name: Check if PR exists
+        id: pr_check
         run: |
-          gh pr create -B main -H test1 --title 'Merge branch_to_merge into base_branch' --body 'Created by Github action' --draft
-          PR_NUMBER: ${{ github.event.number }}
+          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
+          if [ -z "$PR_URL" ]; then
+            echo "No PR found, will create a new one."
+            echo "PR_EXISTS=false" >> $GITHUB_ENV
+          else
+            echo "PR found, updating it."
+            echo "PR_EXISTS=true" >> $GITHUB_ENV
+            echo "PR_URL=$PR_URL" >> $GITHUB_ENV
+          fi
+
+      - name: Create or Update Pull Request
+        id: create_or_update_pr
+        run: |
+          if [ "${{ env.PR_EXISTS }}" == "false" ]; then
+            # Create a new PR if none exists
+            gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft
+          else
+            # Update the existing PR to draft (or any other changes)
+            gh pr edit $PR_URL --add-label "draft"
+            echo "Updated existing PR: $PR_URL"
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
 
       - name: Convert PR to Draft if Tests Fail
         if: failure()
-        run: gh pr ready --undo "$PR_NUMBER"
+        run: |
+          gh pr ready --undo "$PR_URL"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ env.PR_NUMBER }}
+          PR_URL: ${{ env.PR_URL }}
