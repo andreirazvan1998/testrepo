@@ -62,18 +62,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update Existing PR (if PR exists) and Move to Open if Tests Pass
+      - name: Update Existing PR (if PR exists)
         if: env.PR_EXISTS == 'true' && success()  # Only run if PR exists and tests passed
         run: |
           echo "Tests passed, converting the PR to open"
           gh pr ready "$PR_URL"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Move PR to Draft if Tests Fail
-        if: failure() && env.PR_EXISTS == 'true'  # Only run if the PR exists and tests failed
-        run: |
-          echo "Tests failed, converting the PR to draft"
-          gh pr ready --undo "$PR_URL"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
