@@ -38,31 +38,32 @@ jobs:
             echo "No PR found, will create a new one."
             echo "PR_EXISTS=false" >> $GITHUB_ENV
           else
-            echo "PR found, updating it."
+            echo "PR found, skipping creation."
             echo "PR_EXISTS=true" >> $GITHUB_ENV
             echo "PR_URL=$PR_URL" >> $GITHUB_ENV
           fi
 
-      - name: Create or Update Pull Request
-        id: create_or_update_pr
+      - name: Create Pull Request as Draft
+        id: create_pr
+        if: env.PR_EXISTS == 'false'
         run: |
-          if [ "${{ env.PR_EXISTS }}" == "false" ]; then
-            # Create a new PR if none exists
-            gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft
-          else
-            # Update the existing PR to draft (or any other changes)
-            gh pr edit $PR_URL --add-label "draft"
-            echo "Updated existing PR: $PR_URL"
-          fi
+          gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Convert PR to Draft if Tests Fail
-        if: failure()
+      - name: Convert PR to Open if Tests Pass
+        if: success() && env.PR_EXISTS == 'false'  # Only if the tests pass and the PR didn't exist
         run: |
-          gh pr ready --undo "$PR_URL"
+          # If PR was created as draft, convert it to open
+          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
+          gh pr ready --draft "$PR_URL"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_URL: ${{ env.PR_URL }}
 
-          
+      - name: Update Existing PR (if PR exists)
+        if: env.PR_EXISTS == 'true' && success()  # Only run if PR exists and tests passed
+        run: |
+          echo "Tests passed, converting the PR to open"
+          gh pr ready "$PR_URL"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
