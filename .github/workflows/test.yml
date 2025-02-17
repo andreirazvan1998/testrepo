@@ -48,7 +48,7 @@ jobs:
           gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - name: Run Pytest
         id: pytest
         run: pytest test_script.py
@@ -62,6 +62,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Add Reviewers to PR
+        if: success() && env.PR_EXISTS == 'false'  # Only if the tests pass and the PR didn't exist and we can add more reviewers add one more -request-reviewer <reviewer>
+        run: |
+          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
+          # Add reviewers (replace with the GitHub usernames of the reviewers)
+          gh pr review "$PR_URL" --request-reviewer RadiCarolAlin     
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
       - name: Update Existing PR (if PR exists)
         if: env.PR_EXISTS == 'true' && success()  # Only run if PR exists and tests passed
         run: |
