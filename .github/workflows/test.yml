@@ -76,6 +76,7 @@ jobs:
         run: |
           echo "Tests passed, converting the PR to open"
           gh pr ready "$PR_URL"
+          gh pr edit "$PR_URL" --add-reviewer RadiCarolAlin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
