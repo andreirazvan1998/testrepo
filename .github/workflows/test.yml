@@ -33,7 +33,7 @@ jobs:
       - name: Create Pull Request
         id: create_pr
         run: |
-          gh pr create -B main -H test1 --title 'Merge branch_to_merge into base_branch' --body 'Created by Github action'
+          gh pr create -B main -H test1 --title 'Merge branch_to_merge into base_branch' --body 'Created by Github action' --draft
          
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
