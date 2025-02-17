@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   delete_branch:
@@ -17,6 +18,6 @@ jobs:
         run: |
           BRANCH_NAME=${{ github.event.pull_request.head.ref }}
           echo "Deleting branch $BRANCH_NAME"
-          git push origin --delete $BRANCH_NAME
+          gh api -X DELETE repos/${{ github.repository }}/git/refs/heads/$BRANCH_NAME
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
