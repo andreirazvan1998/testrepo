@@ -1,12 +1,15 @@
 name: Run Pytest on PR
 
 on:
-  pull_request:
+  push:
     branches:
-      - main  # Change this if needed (e.g., main, staging)
+      - '**'  # This will trigger on all branches
+
+permissions:
+  pull-requests: write
 
 jobs:
-  test:
+  test_and_create_pr:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,7 +19,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'  # Adjust to your version
+          python-version: '3.9'
 
       - name: Install dependencies
         run: |
@@ -24,22 +27,25 @@ jobs:
           pip install pytest  # Ensure you have a requirements file
 
       - name: Run Pytest
-        run: pytest test_script.py  # Change this to match your test file
+        id: pytest
+        run: pytest test_script.py
 
       - name: Create Pull Request
         id: create_pr
         run: |
-          gh pr create -B main -H test1 --title 'Merge branch_to_merge into base_branch' --body 'Created by Github action'
-          export PR_NUMBER="${{ github.event.pull_request.number || github.event.issue.number }}"
-          echo $PR_NUMBER
+          PR_NUMBER=$(gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by Github Action' --json number -q .number)
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Mark PR as Draft if Tests Fail
-        if: failure()
-        run: |
-          curl -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-               -H "Accept: application/vnd.github.v3+json" \
-               https://api.github.com/repos/${{ github.repository }}/pulls/$PR_NUMBER/draft
+      - name: Debug PR Number
+        run: echo "Pull Request Number is $PR_NUMBER"
         env:
+          PR_NUMBER: ${{ env.PR_NUMBER }}
+
+      - name: Convert PR to Draft if Tests Fail
+        if: failure()
+        run: gh pr ready --undo "$PR_NUMBER"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ env.PR_NUMBER }}
