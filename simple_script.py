@@ -20,3 +20,4 @@ if __name__ == "__main__":
     print(f"Sum of 3 and 5: {add_numbers(3, 5)}")
     print(f"Product of 3 and 5: {multiply_numbers(3, 5)}")
     print(f"Difference of 10 and 5: {subtract_numbers(10, 5)}")
+    print("nou")
