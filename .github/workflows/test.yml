@@ -33,8 +33,8 @@ jobs:
       - name: Create Pull Request
         id: create_pr
         run: |
-          PR_NUMBER=$(gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by Github Action' --json number -q .number)
-          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
+          gh pr create -B main -H test1 --title 'Merge branch_to_merge into base_branch' --body 'Created by Github action'
+         
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
