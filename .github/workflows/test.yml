@@ -81,6 +81,12 @@ jobs:
       - name: Move PR to Draft if Tests Fail
         if: env.TESTS_FAILED == 'true' && env.PR_EXISTS == 'true'
         run: |
+          PR_STATE=$(gh pr view "$PR_URL" --json state -q '.state')
+          if [ "$PR_STATE" == "CLOSED" ]; then
+            echo "PR is closed. Cannot move it to draft."
+            exit 0
+          fi
+          
           echo "Tests failed, moving PR back to draft."
           gh pr ready --undo "$PR_URL"
         env:
