@@ -28,31 +28,27 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pytest
-
-      - name: Ensure branch has commits before proceeding
-        run: |
-          # Check if the branch has any commits
-          COMMITS=$(git rev-list --count HEAD)
-          if [ "$COMMITS" -eq 0 ]; then
-            echo "Branch has no commits. Exiting."
-            exit 1
-          fi
           
-      - name: Create Pull Request if it doesn't exist
-        id: create_pr
+      - name: Check if PR exists
+        id: pr_check
         run: |
-          # Ensure the branch is pushed to the remote first
-          git push origin ${{ github.ref_name }} || echo "Branch already pushed"
-          
-          # Check if a PR already exists for the current branch
           PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
           if [ -z "$PR_URL" ]; then
-            # Create a new PR if one doesn't exist
-            echo "No PR found, creating a new one."
-            gh pr create -B main -H ${{ github.ref_name }} --title "Merge ${{ github.ref_name }} into main" --body "Created by GitHub action" --draft
+            echo "No PR found, will create a new one."
+            echo "PR_EXISTS=false" >> $GITHUB_ENV
           else
-            echo "PR already exists, skipping creation."
+            echo "PR found, skipping creation."
+            echo "PR_EXISTS=true" >> $GITHUB_ENV
+            echo "PR_URL=$PR_URL" >> $GITHUB_ENV
           fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Set the token here for gh CLI
+
+      - name: Create Pull Request as Draft
+        id: create_pr
+        if: env.PR_EXISTS == 'false'
+        run: |
+          gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -86,4 +82,4 @@ jobs:
             gh pr ready --undo "$PR_URL"
           fi
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
