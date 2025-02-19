@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - '**'  # Se rulează pe orice branch
+  pull_request:
+    types:
+      - ready_for_review  # Se declanșează când PR-ul iese din draft
 
 permissions:
   pull-requests: write
@@ -26,31 +29,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest  # Asigură-te că ai un requirements.txt
 
-      - name: Check if PR exists
-        id: pr_check
-        run: |
-          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
-          if [ -z "$PR_URL" ]; then
-            echo "No PR found, will create a new one."
-            echo "PR_EXISTS=false" >> $GITHUB_ENV
-          else
-            echo "PR found: $PR_URL"
-            echo "PR_EXISTS=true" >> $GITHUB_ENV
-            echo "PR_URL=$PR_URL" >> $GITHUB_ENV
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create Pull Request as Draft
-        id: create_pr
-        if: env.PR_EXISTS == 'false'
-        run: |
-          PR_URL=$(gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft)
-          echo "PR Created: $PR_URL"
-          echo "PR_URL=$PR_URL" >> $GITHUB_ENV
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Run Pytest
         id: pytest
         continue-on-error: true  # Evităm oprirea workflow-ului în caz de eșec
@@ -60,25 +38,36 @@ jobs:
         id: check_tests
         run: |
           if grep -q "FAILED" pytest-results.txt; then
-            echo "Tests failed! PR will stay in draft."
+            echo "Tests failed! PR will stay or return to draft."
             echo "TESTS_FAILED=true" >> $GITHUB_ENV
           else
-            echo "Tests passed! PR can be opened."
+            echo "Tests passed! PR can be open."
             echo "TESTS_FAILED=false" >> $GITHUB_ENV
         shell: bash
 
-      - name: Convert PR to Open if Tests Pass
-        if: env.TESTS_FAILED == 'false' && env.PR_EXISTS == 'true'
+      - name: Get PR URL
+        id: get_pr
         run: |
-          echo "Tests passed, converting PR to open"
-          gh pr ready "$PR_URL"
+          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
+          if [ -z "$PR_URL" ]; then
+            echo "No PR found."
+            exit 1
+          fi
+          echo "PR_URL=$PR_URL" >> $GITHUB_ENV
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Move PR to Draft if Tests Fail
+        if: env.TESTS_FAILED == 'true'
+        run: |
+          echo "Tests failed, moving PR back to draft."
+          gh pr ready --undo "$PR_URL"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Move PR to Draft if Tests Fail
-        if: env.TESTS_FAILED == 'true' && env.PR_EXISTS == 'true'
+      - name: Convert PR to Open if Tests Pass
+        if: env.TESTS_FAILED == 'false'
         run: |
-          echo "Tests failed, converting PR to draft"
-          gh pr ready --undo "$PR_URL"
+          echo "Tests passed, PR remains open."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
