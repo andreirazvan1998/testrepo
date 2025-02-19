@@ -37,15 +37,19 @@ jobs:
         continue-on-error: true  # Evităm oprirea workflow-ului în caz de eșec
         run: pytest > pytest-results.txt
 
+      - name: Debug - Show Pytest Output
+        run: cat pytest-results.txt || true  # Afișează output-ul testelor pentru debugging
+
       - name: Check if tests failed
         id: check_tests
         run: |
           if grep -q "FAILED" pytest-results.txt; then
-            echo "Tests failed! PR will be moved to draft."
-            echo "TESTS_FAILED=true" >> $GITHUB_ENV
+              echo "Tests failed! PR will be moved to draft."
+              echo "TESTS_FAILED=true" >> $GITHUB_ENV
           else
-            echo "Tests passed! PR can remain open."
-            echo "TESTS_FAILED=false" >> $GITHUB_ENV
+              echo "Tests passed! PR can remain open."
+              echo "TESTS_FAILED=false" >> $GITHUB_ENV
+          fi
         shell: bash
 
       - name: Get PR URL
