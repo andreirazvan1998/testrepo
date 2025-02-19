@@ -3,13 +3,13 @@ name: Run Pytest on PR
 on:
   push:
     branches:
-      - '**'  # This will trigger on all branches
+      - '**'  # Se rulează pe orice branch
 
 permissions:
   pull-requests: write
 
 jobs:
-  test_and_create_pr:
+  test_and_manage_pr:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest  # Ensure you have a requirements file
+          pip install pytest  # Asigură-te că ai un requirements.txt
 
       - name: Check if PR exists
         id: pr_check
@@ -34,58 +34,51 @@ jobs:
             echo "No PR found, will create a new one."
             echo "PR_EXISTS=false" >> $GITHUB_ENV
           else
-            echo "PR found, skipping creation."
+            echo "PR found: $PR_URL"
             echo "PR_EXISTS=true" >> $GITHUB_ENV
             echo "PR_URL=$PR_URL" >> $GITHUB_ENV
           fi
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Set the token here for gh CLI
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Pull Request as Draft
         id: create_pr
         if: env.PR_EXISTS == 'false'
         run: |
-          gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft
+          PR_URL=$(gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft)
+          echo "PR Created: $PR_URL"
+          echo "PR_URL=$PR_URL" >> $GITHUB_ENV
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Pytest
         id: pytest
-        run: pytest test_script.py
+        continue-on-error: true  # Evităm oprirea workflow-ului în caz de eșec
+        run: pytest > pytest-results.txt
+
+      - name: Check if tests failed
+        id: check_tests
+        run: |
+          if grep -q "FAILED" pytest-results.txt; then
+            echo "Tests failed! PR will stay in draft."
+            echo "TESTS_FAILED=true" >> $GITHUB_ENV
+          else
+            echo "Tests passed! PR can be opened."
+            echo "TESTS_FAILED=false" >> $GITHUB_ENV
+        shell: bash
 
       - name: Convert PR to Open if Tests Pass
-        if: success() && env.PR_EXISTS == 'false'  # Only if the tests pass and the PR didn't exist
+        if: env.TESTS_FAILED == 'false' && env.PR_EXISTS == 'true'
         run: |
-          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
+          echo "Tests passed, converting PR to open"
           gh pr ready "$PR_URL"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update Existing PR (if PR exists)
-        if: env.PR_EXISTS == 'true' && success()  # Only run if PR exists and tests passed
-        run: |
-          echo "Tests passed, converting the PR to open"
-          gh pr ready "$PR_URL"
-          
       - name: Move PR to Draft if Tests Fail
-        if: failure() && env.PR_EXISTS == 'true'  # Only run if the PR exists and tests failed
+        if: env.TESTS_FAILED == 'true' && env.PR_EXISTS == 'true'
         run: |
-          echo "Tests failed, converting the PR to draft"
+          echo "Tests failed, converting PR to draft"
           gh pr ready --undo "$PR_URL"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Skip Test Retrigger on Open (Only if Test Passed)
-        if: success() && env.PR_EXISTS == 'true'  # Only run if PR exists and tests passed
-        run: |
-          echo "Tests passed, no retrigger required"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Retrigger Tests if Test Failed and PR is Open
-        if: failure() && env.PR_EXISTS == 'true'  # Retrigger only if the tests failed and PR was switched to open
-        run: |
-          echo "Tests failed, retriggering tests"
-          gh pr ready --undo "$PR_URL"  # Ensure PR goes back to draft if tests are failing
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
