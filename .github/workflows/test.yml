@@ -53,7 +53,7 @@ jobs:
 
       - name: Run Pytest
         id: pytest
-        continue-on-error: true  # Allow the workflow to proceed if tests fail
+        continue-on-error: true  # Allow the workflow to proceed even if tests fail
         run: |
           pytest test_script.py || echo "Tests failed" >> $GITHUB_ENV
           if [ -f "$GITHUB_ENV" ] && grep -q "Tests failed" "$GITHUB_ENV"; then
