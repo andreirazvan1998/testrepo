@@ -3,7 +3,7 @@ name: Run Pytest on PR
 on:
   push:
     branches:
-      - '**'  # Acționează pe toate branch-urile
+      - '**'  # Trigger pentru toate branch-urile
 
 permissions:
   pull-requests: write
@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest  # Asigură-te că ai un fișier requirements.txt dacă ai mai multe dependențe
+          pip install pytest  # Asigură-te că ai un fișier requirements.txt pentru dependențe
 
       - name: Check if PR exists
         id: pr_check
@@ -39,7 +39,7 @@ jobs:
             echo "PR_URL=$PR_URL" >> $GITHUB_ENV
           fi
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Set token pentru gh CLI
 
       - name: Create Pull Request as Draft
         id: create_pr
@@ -59,6 +59,21 @@ jobs:
             echo "TESTS_FAILED=true" >> $GITHUB_ENV
           fi
 
+      - name: Move PR to Draft if Tests Fail
+        if: env.TESTS_FAILED == 'true' && env.PR_EXISTS == 'true'
+        run: |
+          # Verificăm dacă PR-ul este deja în draft
+          PR_STATE=$(gh pr view "$PR_URL" --json state -q '.state')
+          echo "PR state: $PR_STATE"  # Debug log pentru starea PR-ului
+          if [ "$PR_STATE" == "OPEN" ]; then
+            echo "Tests failed, moving PR back to draft."
+            gh pr ready --undo "$PR_URL" || echo "Failed to move PR to draft"
+          else
+            echo "PR is already in draft, no action needed."
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Convert PR to Open if Tests Pass
         if: success() && env.PR_EXISTS == 'false'
         run: |
@@ -74,19 +89,5 @@ jobs:
           echo "Tests passed, converting the PR to open"
           gh pr ready "$PR_URL"
           gh pr edit "$PR_URL" --add-reviewer RadiCarolAlin
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Move PR to Draft if Tests Fail
-        if: env.TESTS_FAILED == 'true' && env.PR_EXISTS == 'true'
-        run: |
-          PR_STATE=$(gh pr view "$PR_URL" --json state -q '.state')
-          echo "PR state: $PR_STATE"  # Debug log pentru starea PR-ului
-          if [ "$PR_STATE" == "CLOSED" ]; then
-            echo "PR is closed. Cannot move it back to draft."
-            exit 0
-          fi
-          echo "Tests failed, moving PR back to draft."
-          gh pr ready --undo "$PR_URL" || echo "Failed to move PR to draft"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
