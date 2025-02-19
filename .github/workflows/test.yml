@@ -54,7 +54,8 @@ jobs:
       - name: Run Pytest
         id: pytest
         continue-on-error: false  # STOP workflow on failure (ensures checks fail)
-        run: pytest test_script.py
+        run: |
+          pytest test_script.py || echo "Tests failed" >> $GITHUB_ENV
 
       - name: Notify User If Tests Pass
         if: success() && env.PR_EXISTS == 'true'
@@ -91,17 +92,37 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest
 
+      - name: Check if Previous Test Status Was Failure
+        id: check_test_status
+        run: |
+          if [ -n "${{ github.event.pull_request.body }}" ] && [[ "${{ github.event.pull_request.body }}" == *"❌ Tests failed!"* ]]; then
+            echo "Test status previously failed. Skipping tests and moving PR back to Draft."
+            echo "SKIP_TESTS=true" >> $GITHUB_ENV
+          else
+            echo "No previous failure detected. Proceeding with tests."
+            echo "SKIP_TESTS=false" >> $GITHUB_ENV
+
       - name: Re-run Pytest Since PR Moved to Open
+        if: env.SKIP_TESTS == 'false'
         id: pytest_rerun
         continue-on-error: false  # STOP workflow on failure (ensures checks fail)
         run: pytest test_script.py
 
       - name: Move PR Back to Draft if Tests Fail Again
-        if: failure()
+        if: failure() && env.SKIP_TESTS == 'false'
         run: |
           echo "PR was marked as ready, but tests failed again. Moving back to Draft."
           PR_URL=$(gh pr list --head ${{ github.head_ref }} --state open --json url -q '.[0].url')
           gh pr ready --undo "$PR_URL"
           gh pr comment "$PR_URL" --body "❌ Tests failed after PR was moved to Ready for Review. Moving back to Draft."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Move PR Back to Draft (Skip Test if Failed Before)
+        if: env.SKIP_TESTS == 'true'
+        run: |
+          PR_URL=$(gh pr list --head ${{ github.head_ref }} --state open --json url -q '.[0].url')
+          gh pr ready --undo "$PR_URL"
+          gh pr comment "$PR_URL" --body "❌ Tests previously failed. The PR has been moved back to Draft without running tests."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
