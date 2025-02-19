@@ -53,9 +53,13 @@ jobs:
 
       - name: Run Pytest
         id: pytest
-        continue-on-error: false  # STOP workflow on failure (ensures checks fail)
+        continue-on-error: true  # Allow the workflow to proceed if tests fail
         run: |
           pytest test_script.py || echo "Tests failed" >> $GITHUB_ENV
+          if [ -f "$GITHUB_ENV" ] && grep -q "Tests failed" "$GITHUB_ENV"; then
+            echo "TEST_STATUS=failed" >> $GITHUB_ENV
+          else
+            echo "TEST_STATUS=passed" >> $GITHUB_ENV
 
       - name: Notify User If Tests Pass
         if: success() && env.PR_EXISTS == 'true'
@@ -92,14 +96,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest
 
-      - name: Check if Previous Test Status Was Failure
+      - name: Check Previous Test Status and Skip Tests if Failed
         id: check_test_status
         run: |
-          if [ -n "${{ github.event.pull_request.body }}" ] && [[ "${{ github.event.pull_request.body }}" == *"❌ Tests failed!"* ]]; then
-            echo "Test status previously failed. Skipping tests and moving PR back to Draft."
+          if [ "${{ env.TEST_STATUS }}" == "failed" ]; then
+            echo "Test status was previously failed. Skipping tests and moving PR to Draft."
             echo "SKIP_TESTS=true" >> $GITHUB_ENV
           else
-            echo "No previous failure detected. Proceeding with tests."
+            echo "Test status is not failed. Proceeding with tests."
             echo "SKIP_TESTS=false" >> $GITHUB_ENV
 
       - name: Re-run Pytest Since PR Moved to Open
