@@ -59,18 +59,15 @@ jobs:
             echo "TESTS_FAILED=true" >> $GITHUB_ENV
           fi
 
-      - name: Move PR to Draft if Tests Fail
+      - name: Close PR and Create New Draft PR if Tests Fail
         if: env.TESTS_FAILED == 'true' && env.PR_EXISTS == 'true'
         run: |
-          # Verificăm dacă PR-ul este deja în draft
-          PR_STATE=$(gh pr view "$PR_URL" --json state -q '.state')
-          echo "PR state: $PR_STATE"  # Debug log pentru starea PR-ului
-          if [ "$PR_STATE" == "OPEN" ]; then
-            echo "Tests failed, moving PR back to draft."
-            gh pr ready --undo "$PR_URL" || echo "Failed to move PR to draft"
-          else
-            echo "PR is already in draft, no action needed."
-          fi
+          # Închidem PR-ul existent și creăm unul nou
+          echo "Tests failed, closing existing PR and creating a new draft PR."
+          gh pr close "$PR_URL"
+          PR_URL=$(gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft)
+          echo "New PR created: $PR_URL"
+          echo "PR_URL=$PR_URL" >> $GITHUB_ENV
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
