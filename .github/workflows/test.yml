@@ -53,13 +53,8 @@ jobs:
 
       - name: Run Pytest
         id: pytest
-        continue-on-error: true  # Allow the workflow to proceed even if tests fail
-        run: |
-          pytest test_script.py || echo "Tests failed" >> $GITHUB_ENV
-          if [ -f "$GITHUB_ENV" ] && grep -q "Tests failed" "$GITHUB_ENV"; then
-            echo "TEST_STATUS=failed" >> $GITHUB_ENV
-          else
-            echo "TEST_STATUS=passed" >> $GITHUB_ENV
+        continue-on-error: false  # STOP workflow on failure (ensures checks fail)
+        run: pytest test_script.py
 
       - name: Notify User If Tests Pass
         if: success() && env.PR_EXISTS == 'true'
@@ -96,33 +91,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest
 
-      - name: Check Previous Test Status
-        id: check_test_status
-        run: |
-          if [ "${{ env.TEST_STATUS }}" == "failed" ]; then
-            echo "Test status was previously failed. Skipping tests and moving PR to Draft."
-            echo "SKIP_TESTS=true" >> $GITHUB_ENV
-          else
-            echo "Test status is not failed. Proceeding with tests."
-            echo "SKIP_TESTS=false" >> $GITHUB_ENV
-
-      - name: Move PR Back to Draft if Tests Failed Previously
-        if: env.SKIP_TESTS == 'true'
-        run: |
-          PR_URL=$(gh pr list --head ${{ github.head_ref }} --state open --json url -q '.[0].url')
-          gh pr ready --undo "$PR_URL"
-          gh pr comment "$PR_URL" --body "❌ Tests previously failed. The PR has been moved back to Draft without rerunning tests."
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Re-run Pytest Since PR Moved to Open
-        if: env.SKIP_TESTS == 'false'
         id: pytest_rerun
         continue-on-error: false  # STOP workflow on failure (ensures checks fail)
         run: pytest test_script.py
 
       - name: Move PR Back to Draft if Tests Fail Again
-        if: failure() && env.SKIP_TESTS == 'false'
+        if: failure()
         run: |
           echo "PR was marked as ready, but tests failed again. Moving back to Draft."
           PR_URL=$(gh pr list --head ${{ github.head_ref }} --state open --json url -q '.[0].url')
