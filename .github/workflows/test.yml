@@ -54,7 +54,10 @@ jobs:
       - name: Run Pytest
         id: pytest
         run: |
-          pytest test_script.py || echo "TESTS_FAILED=true" >> $GITHUB_ENV
+          pytest test_script.py > result.log; tail -n 10 result.log
+          if grep -q "FAILED" result.log; then
+            echo "TESTS_FAILED=true" >> $GITHUB_ENV
+          fi
 
       - name: Convert PR to Open if Tests Pass
         if: success() && env.PR_EXISTS == 'false'
