@@ -29,6 +29,21 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest
 
+      - name: Create Pull Request if it doesn't exist
+        id: create_pr
+        run: |
+          # Check if a PR already exists for the current branch
+          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
+          if [ -z "$PR_URL" ]; then
+            # Create a new PR if one doesn't exist
+            echo "No PR found, creating a new one."
+            gh pr create -B main -H ${{ github.ref_name }} --title "Merge ${{ github.ref_name }} into main" --body "Created by GitHub action" --draft
+          else
+            echo "PR already exists, skipping creation."
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run Pytest
         id: pytest
         continue-on-error: false  # STOP workflow on failure (ensures checks fail)
