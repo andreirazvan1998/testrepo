@@ -29,6 +29,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest
 
+      - name: Ensure branch has commits before proceeding
+        run: |
+          # Check if the branch has any commits
+          COMMITS=$(git rev-list --count HEAD)
+          if [ "$COMMITS" -eq 0 ]; then
+            echo "Branch has no commits. Exiting."
+            exit 1
+          fi
+          
       - name: Create Pull Request if it doesn't exist
         id: create_pr
         run: |
