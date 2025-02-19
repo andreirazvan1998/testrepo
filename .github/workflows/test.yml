@@ -3,16 +3,17 @@ name: Run Pytest on PR
 on:
   push:
     branches:
-      - '**'  # Rulează testele la orice commit
+      - '**'  # Rulează pe toate branch-urile
   pull_request:
     types:
-      - ready_for_review  # Rulează testele când PR-ul iese din draft
+      - ready_for_review  # Rulează când PR-ul iese din draft
   pull_request_target:
     types:
-      - synchronize  # Rulează testele la update pe branch
+      - synchronize  # Rulează testele la orice update pe PR
 
 permissions:
   pull-requests: write
+  contents: write
 
 jobs:
   test_and_manage_pr:
@@ -32,13 +33,38 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest  # Asigură-te că ai un requirements.txt
 
+      - name: Check if PR exists
+        id: pr_check
+        run: |
+          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state all --json url -q '.[0].url')
+          if [ -z "$PR_URL" ]; then
+            echo "No PR found, will create a new draft PR."
+            echo "PR_EXISTS=false" >> $GITHUB_ENV
+          else
+            echo "PR found: $PR_URL"
+            echo "PR_EXISTS=true" >> $GITHUB_ENV
+            echo "PR_URL=$PR_URL" >> $GITHUB_ENV
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Pull Request as Draft
+        id: create_pr
+        if: env.PR_EXISTS == 'false'
+        run: |
+          PR_URL=$(gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft)
+          echo "Created PR: $PR_URL"
+          echo "PR_URL=$PR_URL" >> $GITHUB_ENV
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run Pytest
         id: pytest
-        continue-on-error: true  # Evităm oprirea workflow-ului în caz de eșec
-        run: pytest > pytest-results.txt
+        continue-on-error: true  # Nu oprim workflow-ul la eșec
+        run: pytest | tee pytest-results.txt
 
-      - name: Debug - Show Pytest Output
-        run: cat pytest-results.txt || true  # Afișează output-ul testelor pentru debugging
+      - name: Debug - Show pytest output
+        run: cat pytest-results.txt
 
       - name: Check if tests failed
         id: check_tests
@@ -52,32 +78,16 @@ jobs:
           fi
         shell: bash
 
-      - name: Get PR URL
-        id: get_pr
-        run: |
-          PR_URL=$(gh pr view ${{ github.event.pull_request.number }} --json url -q '.url')
-          echo "PR_URL=$PR_URL" >> $GITHUB_ENV
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Move PR to Draft if Tests Fail
-        if: env.TESTS_FAILED == 'true'
+        if: env.TESTS_FAILED == 'true' && env.PR_EXISTS == 'true'
         run: |
           echo "Tests failed, moving PR back to draft."
           gh pr ready --undo "$PR_URL"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Ensure PR Stays in Draft if Tests Fail Again
-        if: env.TESTS_FAILED == 'true'
-        run: |
-          echo "Ensuring PR remains in draft."
-          gh pr ready --undo "$PR_URL"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Convert PR to Open if Tests Pass
-        if: env.TESTS_FAILED == 'false'
+        if: env.TESTS_FAILED == 'false' && env.PR_EXISTS == 'true'
         run: |
           echo "Tests passed, PR remains open."
         env:
