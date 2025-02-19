@@ -44,13 +44,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Fetch all branches to ensure the branch is available
+      - name: Fetch the branch from remote
         run: |
-          git fetch --all
-          
+          git fetch origin ${{ github.ref_name }}
+
       - name: Create Pull Request as Draft
         if: env.PR_EXISTS == 'false'
         run: |
+          # Ensure both main and the current branch are available
+          git fetch origin main
+          git fetch origin ${{ github.ref_name }}
+          
           BASE_SHA=$(git rev-parse origin/main)
           HEAD_SHA=$(git rev-parse origin/${{ github.ref_name }})
           
