@@ -50,6 +50,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Move PR to Draft on every push
+        run: |
+          # Check if the PR exists and force it to draft mode
+          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
+          if [ -n "$PR_URL" ]; then
+            echo "Forcing PR back to draft after push."
+            gh pr ready --undo "$PR_URL"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   enforce_tests_on_open:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' && github.event.action == 'ready_for_review'
