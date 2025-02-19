@@ -1,41 +1,40 @@
-name: Run Pytest on PR
+name: Create Draft PR
 
 on:
   push:
     branches:
       - '**'  # Runs on all branches
-    # Add condition to check for existing draft PRs or use other events like 'pull_request'
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
+
+permissions:
+  pull-requests: write
 
 jobs:
-  test_and_create_pr:
+  create_pr:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Check if PR exists (draft or open)
+      - name: Check if PR exists
         id: pr_check
         run: |
           PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
           if [ -z "$PR_URL" ]; then
-            echo "No PR found, skipping creation for this branch."
+            echo "No PR found, will create a new one."
             echo "PR_EXISTS=false" >> $GITHUB_ENV
           else
-            echo "PR exists, skipping creation for this branch."
+            echo "PR found, skipping creation."
             echo "PR_EXISTS=true" >> $GITHUB_ENV
             echo "PR_URL=$PR_URL" >> $GITHUB_ENV
           fi
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Set the token here for gh CLI
 
-      # Only run pytest if a PR exists (and no PR creation for this branch)
-      - name: Run Pytest
-        if: env.PR_EXISTS == 'true'
+      - name: Create Pull Request as Draft
+        id: create_pr
+        if: env.PR_EXISTS == 'false'
         run: |
-          pytest test_script.py
+          gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
