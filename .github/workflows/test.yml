@@ -96,7 +96,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest
 
-      - name: Check Previous Test Status and Skip Tests if Failed
+      - name: Check Previous Test Status
         id: check_test_status
         run: |
           if [ "${{ env.TEST_STATUS }}" == "failed" ]; then
@@ -105,6 +105,15 @@ jobs:
           else
             echo "Test status is not failed. Proceeding with tests."
             echo "SKIP_TESTS=false" >> $GITHUB_ENV
+
+      - name: Move PR Back to Draft if Tests Failed Previously
+        if: env.SKIP_TESTS == 'true'
+        run: |
+          PR_URL=$(gh pr list --head ${{ github.head_ref }} --state open --json url -q '.[0].url')
+          gh pr ready --undo "$PR_URL"
+          gh pr comment "$PR_URL" --body "❌ Tests previously failed. The PR has been moved back to Draft without rerunning tests."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Re-run Pytest Since PR Moved to Open
         if: env.SKIP_TESTS == 'false'
@@ -119,14 +128,5 @@ jobs:
           PR_URL=$(gh pr list --head ${{ github.head_ref }} --state open --json url -q '.[0].url')
           gh pr ready --undo "$PR_URL"
           gh pr comment "$PR_URL" --body "❌ Tests failed after PR was moved to Ready for Review. Moving back to Draft."
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Move PR Back to Draft (Skip Test if Failed Before)
-        if: env.SKIP_TESTS == 'true'
-        run: |
-          PR_URL=$(gh pr list --head ${{ github.head_ref }} --state open --json url -q '.[0].url')
-          gh pr ready --undo "$PR_URL"
-          gh pr comment "$PR_URL" --body "❌ Tests previously failed. The PR has been moved back to Draft without running tests."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
