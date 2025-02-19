@@ -81,11 +81,12 @@ jobs:
         if: env.TESTS_FAILED == 'true' && env.PR_EXISTS == 'true'
         run: |
           PR_STATE=$(gh pr view "$PR_URL" --json state -q '.state')
+          echo "PR state: $PR_STATE"  # Debug log pentru starea PR-ului
           if [ "$PR_STATE" == "CLOSED" ]; then
             echo "PR is closed. Cannot move it back to draft."
             exit 0
           fi
           echo "Tests failed, moving PR back to draft."
-          gh pr ready --undo "$PR_URL"
+          gh pr ready --undo "$PR_URL" || echo "Failed to move PR to draft"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
