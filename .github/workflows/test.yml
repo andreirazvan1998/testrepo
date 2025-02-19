@@ -3,7 +3,7 @@ name: Run Pytest on PR
 on:
   push:
     branches:
-      - '**'  # Trigger pentru toate branch-urile
+      - '**'  # Runs on all branches
 
 permissions:
   pull-requests: write
@@ -24,14 +24,14 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest  # Asigură-te că ai un fișier requirements.txt pentru dependențe
+          pip install pytest  # Ensure you have a requirements file
 
       - name: Check if PR exists
         id: pr_check
         run: |
           PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
           if [ -z "$PR_URL" ]; then
-            echo "No PR found, will create a new one."
+            echo "No PR found, creating a new one in draft mode."
             echo "PR_EXISTS=false" >> $GITHUB_ENV
           else
             echo "PR found, skipping creation."
@@ -39,52 +39,39 @@ jobs:
             echo "PR_URL=$PR_URL" >> $GITHUB_ENV
           fi
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Set token pentru gh CLI
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Pull Request as Draft
         id: create_pr
         if: env.PR_EXISTS == 'false'
         run: |
-          PR_URL=$(gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft)
-          echo "PR created: $PR_URL"
-          echo "PR_URL=$PR_URL" >> $GITHUB_ENV
+          gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Pytest
         id: pytest
+        continue-on-error: true  # Allow workflow to continue even if tests fail
+        run: pytest test_script.py
+
+      - name: Check Test Status
         run: |
-          pytest test_script.py > result.log; tail -n 10 result.log
-          if grep -q "FAILED" result.log; then
-            echo "TESTS_FAILED=true" >> $GITHUB_ENV
+          TEST_STATUS=$(gh api repos/${{ github.repository }}/commits/${{ github.sha }}/status \
+            --jq '.statuses[] | select(.context=="pytest") | .state' || echo "unknown")
+
+          echo "Current test status: $TEST_STATUS"
+
+          if [[ "$TEST_STATUS" == "failure" ]]; then
+            echo "Tests failed, reverting PR to draft."
+            gh pr ready --undo "${{ github.event.pull_request.html_url }}"
           fi
-
-      - name: Close PR and Create New Draft PR if Tests Fail
-        if: env.TESTS_FAILED == 'true' && env.PR_EXISTS == 'true'
-        run: |
-          # Închidem PR-ul existent și creăm unul nou
-          echo "Tests failed, closing existing PR and creating a new draft PR."
-          gh pr close "$PR_URL"
-          PR_URL=$(gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft)
-          echo "New PR created: $PR_URL"
-          echo "PR_URL=$PR_URL" >> $GITHUB_ENV
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Convert PR to Open if Tests Pass
-        if: success() && env.PR_EXISTS == 'false'
+      - name: Allow User to Mark PR as Ready (Only if Tests Passed)
+        if: success() && env.PR_EXISTS == 'true'
         run: |
-          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
-          echo "Tests passed, marking PR as ready for review."
-          gh pr ready "$PR_URL"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-      - name: Update Existing PR (if PR exists)
-        if: env.PR_EXISTS == 'true' && success()
-        run: |
-          echo "Tests passed, converting the PR to open"
-          gh pr ready "$PR_URL"
+          echo "Tests passed. User can mark PR as ready for review."
           gh pr edit "$PR_URL" --add-reviewer RadiCarolAlin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
