@@ -3,10 +3,13 @@ name: Run Pytest on PR
 on:
   push:
     branches:
-      - '**'  # Se rulează pe orice branch
+      - '**'  # Rulează testele la orice commit
   pull_request:
     types:
-      - ready_for_review  # Se declanșează când PR-ul iese din draft
+      - ready_for_review  # Rulează testele când PR-ul iese din draft
+  pull_request_target:
+    types:
+      - synchronize  # Rulează testele la update pe branch
 
 permissions:
   pull-requests: write
@@ -38,21 +41,17 @@ jobs:
         id: check_tests
         run: |
           if grep -q "FAILED" pytest-results.txt; then
-            echo "Tests failed! PR will stay or return to draft."
+            echo "Tests failed! PR will be moved to draft."
             echo "TESTS_FAILED=true" >> $GITHUB_ENV
           else
-            echo "Tests passed! PR can be open."
+            echo "Tests passed! PR can remain open."
             echo "TESTS_FAILED=false" >> $GITHUB_ENV
         shell: bash
 
       - name: Get PR URL
         id: get_pr
         run: |
-          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
-          if [ -z "$PR_URL" ]; then
-            echo "No PR found."
-            exit 1
-          fi
+          PR_URL=$(gh pr view ${{ github.event.pull_request.number }} --json url -q '.url')
           echo "PR_URL=$PR_URL" >> $GITHUB_ENV
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -61,6 +60,14 @@ jobs:
         if: env.TESTS_FAILED == 'true'
         run: |
           echo "Tests failed, moving PR back to draft."
+          gh pr ready --undo "$PR_URL"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ensure PR Stays in Draft if Tests Fail Again
+        if: env.TESTS_FAILED == 'true'
+        run: |
+          echo "Ensuring PR remains in draft."
           gh pr ready --undo "$PR_URL"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
