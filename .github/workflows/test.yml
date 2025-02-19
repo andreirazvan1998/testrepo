@@ -3,7 +3,7 @@ name: Run Pytest on PR
 on:
   push:
     branches:
-      - '**'  # This will trigger on all branches
+      - '**'  # Triggers on all branches
 
 permissions:
   pull-requests: write
@@ -39,42 +39,53 @@ jobs:
             echo "PR_URL=$PR_URL" >> $GITHUB_ENV
           fi
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Set the token here for gh CLI
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Pull Request as Draft
         id: create_pr
         if: env.PR_EXISTS == 'false'
         run: |
-          gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft
+          PR_URL=$(gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft)
+          echo "PR_URL=$PR_URL" >> $GITHUB_ENV
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Pytest
         id: pytest
         run: pytest test_script.py
-      - name: Convert PR to Open if Tests Pass
-      
-        if: success() && env.PR_EXISTS == 'false'  # Only if the tests pass and the PR didn't exist
+
+      - name: Set PR Status Check
+        if: always()
         run: |
-          # If PR was created as draft, convert it to open
-          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
-          gh pr ready "$PR_URL"
+          if [ "${{ job.status }}" == "success" ]; then
+            gh api --method POST repos/${{ github.repository }}/statuses/${{ github.sha }} \
+              -f state=success -f description="Tests passed. You can mark the PR as ready." -f context="pytest"
+          else
+            gh api --method POST repos/${{ github.repository }}/statuses/${{ github.sha }} \
+              -f state=failure -f description="Tests failed. PR must remain in draft." -f context="pytest"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-      - name: Update Existing PR (if PR exists)
-        if: env.PR_EXISTS == 'true' && success()  # Only run if PR exists and tests passed
+
+      - name: Add Reviewer (If PR Exists)
+        if: env.PR_EXISTS == 'true' && success()
         run: |
-          echo "Tests passed, converting the PR to open"
-          gh pr ready "$PR_URL"
+          echo "Tests passed, assigning reviewer"
           gh pr edit "$PR_URL" --add-reviewer RadiCarolAlin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Move PR to Draft if Tests Fail
-        if: failure() && env.PR_EXISTS == 'true'  # Only run if the PR exists and tests failed
+
+  enforce_draft:
+    runs-on: ubuntu-latest
+    if: github.event.action == 'ready_for_review'
+    steps:
+      - name: Check Test Status
         run: |
-          echo "Tests failed, converting the PR to draft"
-          gh pr ready --undo "$PR_URL"
+          TEST_STATUS=$(gh api repos/${{ github.repository }}/commits/${{ github.sha }}/status \
+            -q '.statuses[] | select(.context=="pytest") | .state')
+
+          if [ "$TEST_STATUS" == "failure" ]; then
+            echo "Tests failed, reverting PR to draft."
+            gh pr ready --undo "${{ github.event.pull_request.html_url }}"
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
