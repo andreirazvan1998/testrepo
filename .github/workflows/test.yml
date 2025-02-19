@@ -3,10 +3,7 @@ name: Run Pytest on PR
 on:
   push:
     branches:
-      - '**'  # Runs on all branches
-  pull_request:
-    types:
-      - ready_for_review  # Trigger when PR is moved from draft to open
+      - '**'  # This will trigger on all branches
 
 permissions:
   pull-requests: write
@@ -27,14 +24,14 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
+          pip install pytest  # Ensure you have a requirements file
 
       - name: Check if PR exists
         id: pr_check
         run: |
           PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
           if [ -z "$PR_URL" ]; then
-            echo "No PR found, creating a new one in draft mode."
+            echo "No PR found, will create a new one."
             echo "PR_EXISTS=false" >> $GITHUB_ENV
           else
             echo "PR found, skipping creation."
@@ -42,9 +39,10 @@ jobs:
             echo "PR_URL=$PR_URL" >> $GITHUB_ENV
           fi
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Set the token here for gh CLI
 
       - name: Create Pull Request as Draft
+        id: create_pr
         if: env.PR_EXISTS == 'false'
         run: |
           gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft
@@ -53,55 +51,41 @@ jobs:
 
       - name: Run Pytest
         id: pytest
-        continue-on-error: false  # STOP workflow on failure (ensures checks fail)
         run: pytest test_script.py
 
-      - name: Notify User If Tests Pass
-        if: success() && env.PR_EXISTS == 'true'
+      - name: Convert PR to Open if Tests Pass
+        if: success() && env.PR_EXISTS == 'false'  # Only if the tests pass and the PR didn't exist
         run: |
-          echo "Tests passed. You can now move the PR to Ready for Review."
-          gh pr comment "$PR_URL" --body "✅ Tests passed! You can now mark this PR as Ready for Review."
+          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
+          gh pr ready "$PR_URL"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Update Existing PR (if PR exists)
+        if: env.PR_EXISTS == 'true' && success()  # Only run if PR exists and tests passed
+        run: |
+          echo "Tests passed, converting the PR to open"
+          gh pr ready "$PR_URL"
+          
       - name: Move PR to Draft if Tests Fail
-        if: failure() && env.PR_EXISTS == 'true'
+        if: failure() && env.PR_EXISTS == 'true'  # Only run if the PR exists and tests failed
         run: |
-          echo "Tests failed, forcing PR back to draft."
+          echo "Tests failed, converting the PR to draft"
           gh pr ready --undo "$PR_URL"
-          gh pr comment "$PR_URL" --body "❌ Tests failed! The PR has been moved back to Draft."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  enforce_tests_on_open:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.event.action == 'ready_for_review'
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-
-      - name: Install dependencies
+      - name: Skip Test Retrigger on Open (Only if Test Passed)
+        if: success() && env.PR_EXISTS == 'true'  # Only run if PR exists and tests passed
         run: |
-          python -m pip install --upgrade pip
-          pip install pytest
+          echo "Tests passed, no retrigger required"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Re-run Pytest Since PR Moved to Open
-        id: pytest_rerun
-        continue-on-error: false  # STOP workflow on failure (ensures checks fail)
-        run: pytest test_script.py
-
-      - name: Move PR Back to Draft if Tests Fail Again
-        if: failure()
+      - name: Retrigger Tests if Test Failed and PR is Open
+        if: failure() && env.PR_EXISTS == 'true'  # Retrigger only if the tests failed and PR was switched to open
         run: |
-          echo "PR was marked as ready, but tests failed again. Moving back to Draft."
-          PR_URL=$(gh pr list --head ${{ github.head_ref }} --state open --json url -q '.[0].url')
-          gh pr ready --undo "$PR_URL"
-          gh pr comment "$PR_URL" --body "❌ Tests failed after PR was moved to Ready for Review. Moving back to Draft."
+          echo "Tests failed, retriggering tests"
+          gh pr ready --undo "$PR_URL"  # Ensure PR goes back to draft if tests are failing
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
