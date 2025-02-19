@@ -29,71 +29,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest
 
-      - name: Check if PR exists
-        id: pr_check
-        run: |
-          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
-          if [ -z "$PR_URL" ]; then
-            echo "No PR found, creating a new one in draft mode."
-            echo "PR_EXISTS=false" >> $GITHUB_ENV
-          else
-            echo "PR found, skipping creation."
-            echo "PR_EXISTS=true" >> $GITHUB_ENV
-            echo "PR_URL=$PR_URL" >> $GITHUB_ENV
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Fetch the branch from remote
-        run: |
-          git fetch origin ${{ github.ref_name }}
-
-      - name: Create Pull Request as Draft
-        if: env.PR_EXISTS == 'false'
-        run: |
-          # Ensure both main and the current branch are available
-          git fetch origin main
-          git fetch origin ${{ github.ref_name }}
-          
-          BASE_SHA=$(git rev-parse origin/main)
-          HEAD_SHA=$(git rev-parse origin/${{ github.ref_name }})
-          
-          if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
-            echo "Error: One of the branches does not have a commit. Cannot create PR."
-            exit 1
-          fi
-          
-          gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Run Pytest
         id: pytest
         continue-on-error: false  # STOP workflow on failure (ensures checks fail)
         run: pytest test_script.py
 
       - name: Notify User If Tests Pass
-        if: success() && env.PR_EXISTS == 'true'
+        if: success()
         run: |
           echo "Tests passed. You can now move the PR to Ready for Review."
-          gh pr comment "$PR_URL" --body "✅ Tests passed! You can now mark this PR as Ready for Review."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Move PR to Draft if Tests Fail
-        if: failure() && env.PR_EXISTS == 'true'
+        if: failure()
         run: |
           echo "Tests failed, forcing PR back to draft."
-          gh pr ready --undo "$PR_URL"
-          gh pr comment "$PR_URL" --body "❌ Tests failed! The PR has been moved back to Draft."
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Move PR to Draft on every push
-        if: env.PR_EXISTS == 'true'
-        run: |
-          echo "Forcing PR back to draft after push."
-          gh pr ready --undo "$PR_URL"
+          gh pr ready --undo "${{ github.event.pull_request.html_url }}"
+          gh pr comment "${{ github.event.pull_request.html_url }}" --body "❌ Tests failed! The PR has been moved back to Draft."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
