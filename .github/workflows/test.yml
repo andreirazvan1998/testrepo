@@ -60,36 +60,3 @@ jobs:
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  enforce_tests_on_open:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.event.action == 'ready_for_review'
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest
-
-      - name: Re-run Pytest Since PR Moved to Open
-        id: pytest_rerun
-        continue-on-error: false  # STOP workflow on failure (ensures checks fail)
-        run: pytest test_script.py
-
-      - name: Move PR Back to Draft if Tests Fail Again
-        if: failure()
-        run: |
-          echo "PR was marked as ready, but tests failed again. Moving back to Draft."
-          PR_URL=$(gh pr list --head ${{ github.head_ref }} --state open --json url -q '.[0].url')
-          gh pr ready --undo "$PR_URL"
-          gh pr comment "$PR_URL" --body "❌ Tests failed after PR was moved to Ready for Review. Moving back to Draft."
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
