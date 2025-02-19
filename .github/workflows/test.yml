@@ -47,6 +47,18 @@ jobs:
       - name: Create Pull Request as Draft
         if: env.PR_EXISTS == 'false'
         run: |
+          # Ensure branches have commits
+          git fetch origin main
+          git fetch origin ${{ github.ref_name }}
+          
+          BASE_SHA=$(git rev-parse origin/main)
+          HEAD_SHA=$(git rev-parse origin/${{ github.ref_name }})
+          
+          if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
+            echo "Error: One of the branches does not have a commit. Cannot create PR."
+            exit 1
+          fi
+          
           gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
