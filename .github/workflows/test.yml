@@ -73,7 +73,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  rerun_tests_on_ready:
+  enforce_tests_on_open:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' && github.event.action == 'ready_for_review'
 
@@ -100,7 +100,8 @@ jobs:
         if: failure()
         run: |
           echo "PR was marked as ready, but tests failed again. Moving back to Draft."
-          gh pr ready --undo "$GITHUB_REF"
-          gh pr comment "$GITHUB_REF" --body "❌ Tests failed again after PR was marked Ready. Moving back to Draft."
+          PR_URL=$(gh pr list --head ${{ github.head_ref }} --state open --json url -q '.[0].url')
+          gh pr ready --undo "$PR_URL"
+          gh pr comment "$PR_URL" --body "❌ Tests failed after PR was moved to Ready for Review. Moving back to Draft."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
