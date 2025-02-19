@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - '**'  # Runs on all branches
+  pull_request:
+    types:
+      - ready_for_review  # Trigger when PR is moved from draft to open
 
 permissions:
   pull-requests: write
@@ -53,11 +56,11 @@ jobs:
         continue-on-error: false  # STOP workflow on failure (ensures checks fail)
         run: pytest test_script.py
 
-      - name: Allow User to Mark PR as Ready (If Tests Pass)
+      - name: Notify User If Tests Pass
         if: success() && env.PR_EXISTS == 'true'
         run: |
-          echo "Tests passed. User can now mark PR as ready for review."
-          gh pr edit "$PR_URL" --add-reviewer RadiCarolAlin
+          echo "Tests passed. You can now move the PR to Ready for Review."
+          gh pr comment "$PR_URL" --body "✅ Tests passed! You can now mark this PR as Ready for Review."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -66,5 +69,38 @@ jobs:
         run: |
           echo "Tests failed, forcing PR back to draft."
           gh pr ready --undo "$PR_URL"
+          gh pr comment "$PR_URL" --body "❌ Tests failed! The PR has been moved back to Draft."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  rerun_tests_on_ready:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.action == 'ready_for_review'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Re-run Pytest Since PR Moved to Open
+        id: pytest_rerun
+        continue-on-error: false  # STOP workflow on failure (ensures checks fail)
+        run: pytest test_script.py
+
+      - name: Move PR Back to Draft if Tests Fail Again
+        if: failure()
+        run: |
+          echo "PR was marked as ready, but tests failed again. Moving back to Draft."
+          gh pr ready --undo "$GITHUB_REF"
+          gh pr comment "$GITHUB_REF" --body "❌ Tests failed again after PR was marked Ready. Moving back to Draft."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
