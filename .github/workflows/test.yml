@@ -7,6 +7,7 @@ on:
   pull_request:
     types:
       - ready_for_review  # Trigger when PR is moved from draft to open
+  workflow_dispatch:  # Manual trigger for E2E tests
 
 permissions:
   pull-requests: write
@@ -29,43 +30,43 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest
 
-      - name: Run Pytest
+      - name: Run Unit Tests
         id: pytest
-        continue-on-error: false  # STOP workflow on failure (ensures checks fail)
+        continue-on-error: false  # Stop workflow on failure
         run: pytest test_script.py
 
       - name: Notify User If Tests Pass
         if: success()
-        run: |
-          echo "Tests passed. You can now move the PR to Ready for Review."
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "✅ Unit tests passed. PR can now be reviewed."
 
       - name: Move PR to Draft if Tests Fail
         if: failure()
         run: |
-          echo "Tests failed, forcing PR back to draft."
+          echo "❌ Tests failed, moving PR back to draft."
           gh pr ready --undo "${{ github.event.pull_request.html_url }}"
-          gh pr comment "${{ github.event.pull_request.html_url }}" --body "❌ Tests failed! The PR has been moved back to Draft."
+          gh pr comment "${{ github.event.pull_request.html_url }}" --body "❌ Unit tests failed! PR moved back to Draft."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Move PR to Draft on every push
+  e2e_tests:
+    needs: test_and_manage_pr  # Run only if the previous job succeeds
+    if: github.event_name == 'workflow_dispatch' && github.event.pull_request.state == 'open'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
         run: |
-          # Check if the PR exists and force it to draft mode
-          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
-          if [ -n "$PR_URL" ]; then
-            echo "Forcing PR back to draft after push."
-            gh pr ready --undo "$PR_URL"
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Update Existing PR (if PR exists)
-        if: success() && env.PR_EXISTS == 'true'  # Only run if PR exists and tests passed
-        run: |
-          echo "Tests passed, converting the PR to open"
-          gh pr ready "$PR_URL"
-          gh pr edit "$PR_URL" --add-reviewer RadiCarolAlin
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Run E2E Tests
+        id: e2e
+        run: pytest e2etests.py
