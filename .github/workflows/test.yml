@@ -1,9 +1,6 @@
 name: Run Pytest on PR
 
 on:
-  push:
-    branches:
-      - '**'  # Runs on all branches
   pull_request:
     types:
       - ready_for_review  # Trigger when PR is moved from draft to open
@@ -67,12 +64,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
+          PR_URL=$(gh pr list --state open --json number,url,headRefName -q '.[] | select(.headRefName == "${{ github.head_ref }}") | .url')
           if [ -z "$PR_URL" ]; then
             echo "❌ PR is not open. Cancelling E2E tests."
             exit 1
           else
             echo "✅ PR is open. Proceeding with E2E tests."
+            echo "PR_URL=$PR_URL" >> $GITHUB_ENV
           fi
 
       - name: Run E2E Tests
