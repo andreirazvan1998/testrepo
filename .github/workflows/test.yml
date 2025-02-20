@@ -34,6 +34,7 @@ jobs:
 
   unit_tests:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || !steps.cache.outputs.cache-hit }} # Only run unit tests if not already cached
 
     steps:
       - name: Checkout repository
@@ -53,6 +54,15 @@ jobs:
         id: pytest
         run: pytest test_script.py
 
+      - name: Cache Test Results
+        id: cache
+        uses: actions/cache@v3
+        with:
+          path: test_results.txt  # Use a file to store test results (e.g., a marker file)
+          key: ${{ runner.os }}-test-results-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-test-results-
+
       - name: Move PR to Draft if Tests Fail
         if: failure()
         env:
@@ -62,8 +72,6 @@ jobs:
           gh auth setup-git
           gh pr ready --undo "${{ github.event.pull_request.html_url }}"
           gh pr comment "${{ github.event.pull_request.html_url }}" --body "❌ Unit tests failed! PR moved back to Draft."
-
-  
 
   e2e_tests:
     needs: unit_tests  # Only run if unit tests pass
