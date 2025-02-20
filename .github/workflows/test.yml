@@ -13,6 +13,25 @@ permissions:
   pull-requests: write
 
 jobs:
+
+  move_pr_to_draft_on_push:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Move PR to Draft on Push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh auth setup-git
+          PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url')
+          if [ -n "$PR_URL" ]; then
+            echo "🔄 Moving PR back to draft due to a push."
+            gh pr ready --undo "$PR_URL"
+          fi
+
   unit_tests:
     runs-on: ubuntu-latest
 
@@ -20,23 +39,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-  move_pr_to_draft_on_push:
-  runs-on: ubuntu-latest
-  if: github.event_name == 'push'
-  steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-
-    - name: Move PR to Draft on Push
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        gh auth setup-git
-        PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url')
-        if [ -n "$PR_URL" ]; then
-          echo "🔄 Moving PR back to draft due to a push."
-          gh pr ready --undo "$PR_URL"
-        fi
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
