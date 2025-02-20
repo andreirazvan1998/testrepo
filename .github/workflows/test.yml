@@ -86,6 +86,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh auth setup-git
+          # Get the PR URL using the current branch and ensure the PR is open
           PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url')
           if [ -z "$PR_URL" ]; then
             echo "❌ PR is not open. Cancelling E2E tests."
