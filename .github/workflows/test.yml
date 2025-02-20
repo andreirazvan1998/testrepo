@@ -3,13 +3,36 @@ name: Run Pytest on PR
 on:
   push:
     branches:
-      - '**'  # This will trigger on all branches
+      - '**'  # Runs on all branches
+  pull_request:
+    types:
+      - ready_for_review  # Trigger when PR is moved from draft to open
+  workflow_dispatch:  # Allows manual execution of E2E tests
 
 permissions:
   pull-requests: write
 
 jobs:
-  test_and_create_pr:
+
+  move_pr_to_draft_on_push:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Move PR to Draft on Push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh auth setup-git
+          PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url')
+          if [ -n "$PR_URL" ]; then
+            echo "🔄 Moving PR back to draft due to a push."
+            gh pr ready --undo "$PR_URL"
+          fi
+
+  unit_tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,57 +47,54 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest  # Ensure you have a requirements file
+          pip install pytest
 
-      - name: Check if PR exists
-        id: pr_check
-        run: |
-          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
-          if [ -z "$PR_URL" ]; then
-            echo "No PR found, will create a new one."
-            echo "PR_EXISTS=false" >> $GITHUB_ENV
-          else
-            echo "PR found, skipping creation."
-            echo "PR_EXISTS=true" >> $GITHUB_ENV
-            echo "PR_URL=$PR_URL" >> $GITHUB_ENV
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Set the token here for gh CLI
-
-      - name: Create Pull Request as Draft
-        id: create_pr
-        if: env.PR_EXISTS == 'false'
-        run: |
-          gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Run Pytest
+      - name: Run Unit Tests
         id: pytest
         run: pytest test_script.py
-      - name: Convert PR to Open if Tests Pass
-      
-        if: success() && env.PR_EXISTS == 'false'  # Only if the tests pass and the PR didn't exist
-        run: |
-          # If PR was created as draft, convert it to open
-          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
-          gh pr ready "$PR_URL"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-      - name: Update Existing PR (if PR exists)
-        if: env.PR_EXISTS == 'true' && success()  # Only run if PR exists and tests passed
-        run: |
-          echo "Tests passed, converting the PR to open"
-          gh pr ready "$PR_URL"
-          gh pr edit "$PR_URL" --add-reviewer RadiCarolAlin
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Move PR to Draft if Tests Fail
-        if: failure() && env.PR_EXISTS == 'true'  # Only run if the PR exists and tests failed
-        run: |
-          echo "Tests failed, converting the PR to draft"
-          gh pr ready --undo "$PR_URL"
+        if: failure()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "❌ Unit tests failed, moving PR back to draft."
+          gh auth setup-git
+          gh pr ready --undo "${{ github.event.pull_request.html_url }}"
+          gh pr comment "${{ github.event.pull_request.html_url }}" --body "❌ Unit tests failed! PR moved back to Draft."
+
+  e2e_tests:
+    needs: unit_tests  # Only run if unit tests pass
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Verify PR is Open
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh auth setup-git
+          # Fetch PR data using the correct command
+          PR_STATE=$(gh pr view "${{ github.event.pull_request.number }}" --json state -q ".state")
+          if [ "$PR_STATE" != "OPEN" ]; then
+            echo "❌ PR is not open. Cancelling E2E tests."
+            exit 1
+          else
+            echo "✅ PR is open. Proceeding with E2E tests."
+          fi
+
+      - name: Run E2E Tests
+        run: pytest e2etests.py
