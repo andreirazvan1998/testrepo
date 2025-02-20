@@ -16,7 +16,7 @@ jobs:
   unit_tests:
     runs-on: ubuntu-latest
     if: |
-      github.event_name != 'pull_request' || github.event.pull_request.draft == false || env.TEST_STATUS != 'passed'  # Skip if already passed when in draft
+      github.event_name != 'pull_request' || github.event.pull_request.draft == false || !env.PREVIOUS_TEST_PASSED  # Skip if PR is open and tests passed previously
 
     steps:
       - name: Checkout repository
@@ -36,17 +36,7 @@ jobs:
         id: pytest
         run: |
           pytest test_script.py
-          echo "TEST_STATUS=passed" >> $GITHUB_ENV  # Set test status to passed when unit tests pass
-
-      - name: Move PR to Draft if Tests Fail
-        if: failure()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "❌ Unit tests failed, moving PR back to draft."
-          gh auth setup-git
-          gh pr ready --undo "${{ github.event.pull_request.html_url }}"
-          gh pr comment "${{ github.event.pull_request.html_url }}" --body "❌ Unit tests failed! PR moved back to Draft."
+          echo "PREVIOUS_TEST_PASSED=true" >> $GITHUB_ENV  # Mark tests as passed if they succeed
 
   move_pr_to_draft_on_push:
     runs-on: ubuntu-latest
@@ -68,7 +58,8 @@ jobs:
 
   e2e_tests:
     needs: unit_tests  # Only run if unit tests pass
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: |
+      github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
 
     steps:
