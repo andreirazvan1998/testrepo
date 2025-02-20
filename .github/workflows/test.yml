@@ -31,8 +31,6 @@ jobs:
             echo "🔄 Moving PR back to draft due to a push."
             gh pr ready --undo "$PR_URL"
           fi
-
-
   unit_tests:
     runs-on: ubuntu-latest
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'ready_for_review' || !steps.cache.outputs.cache-hit }} # Only run unit tests if not already cached
