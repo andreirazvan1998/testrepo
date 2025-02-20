@@ -49,17 +49,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          echo "Checking PR status..."
           gh auth setup-git
+          # Get PR URL for the current branch if it's open
           PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url')
+          
           if [ -n "$PR_URL" ]; then
-            echo "🔄 Moving PR back to draft due to a push."
+            echo "🔄 Moving PR back to draft due to push."
             gh pr ready --undo "$PR_URL"
+          else
+            echo "No open PR found. Skipping PR move to draft."
           fi
 
   e2e_tests:
     needs: unit_tests  # Only run if unit tests pass
-    if: |
-      github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' && github.event.pull_request.draft == false
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
