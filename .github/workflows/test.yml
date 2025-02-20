@@ -49,8 +49,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   e2e_tests:
-    needs: test_and_manage_pr  # Ensures E2E tests run only if unit tests pass
-    if: github.event_name == 'workflow_dispatch'  # Runs only when manually triggered
+    needs: test_and_manage_pr  # Runs only if unit tests pass
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
 
     steps:
@@ -74,10 +74,10 @@ jobs:
         run: |
           PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
           if [ -z "$PR_URL" ]; then
-            echo "PR is not open. Cancelling workflow."
+            echo "❌ PR is not open. Cancelling E2E tests."
             exit 1
           else
-            echo "PR is open. Proceeding with E2E tests."
+            echo "✅ PR is open. Proceeding with E2E tests."
           fi
 
       - name: Run E2E Tests
