@@ -40,6 +40,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "❌ Unit tests failed, moving PR back to draft."
+          gh auth setup-git
           gh pr ready --undo "${{ github.event.pull_request.html_url }}"
           gh pr comment "${{ github.event.pull_request.html_url }}" --body "❌ Unit tests failed! PR moved back to Draft."
 
@@ -47,10 +48,14 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
       - name: Move PR to Draft on Push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          gh auth setup-git
           PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url')
           if [ -n "$PR_URL" ]; then
             echo "🔄 Moving PR back to draft due to a push."
@@ -80,6 +85,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          gh auth setup-git
           PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url')
           if [ -z "$PR_URL" ]; then
             echo "❌ PR is not open. Cancelling E2E tests."
