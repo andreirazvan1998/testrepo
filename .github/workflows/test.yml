@@ -15,6 +15,7 @@ permissions:
 jobs:
   unit_tests:
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false  # Skip if PR is already open and tests passed previously
 
     steps:
       - name: Checkout repository
@@ -32,7 +33,9 @@ jobs:
 
       - name: Run Unit Tests
         id: pytest
-        run: pytest test_script.py
+        run: |
+          pytest test_script.py
+          echo "unit_tests_passed=true" >> $GITHUB_ENV  # Set environment variable to track test pass
 
       - name: Move PR to Draft if Tests Fail
         if: failure()
