@@ -39,11 +39,11 @@ jobs:
           echo "Running unit tests..."
           pytest test_script.py --maxfail=1 --disable-warnings --tb=short || exit 1  # Exit explicitly if tests fail
           
-      - name: Check if Tests Failed
-        id: check_test_result
+      - name: Check Test Result and Set Labels
+        id: set_labels
         run: |
           echo "Checking if tests passed or failed..."
-          if [[ -f pytest-status.txt ]]; then
+          if [ $? -ne 0 ]; then
             echo "Test result: failure"
             echo "TEST_RESULT=failure" >> $GITHUB_ENV
           else
@@ -110,4 +110,12 @@ jobs:
           gh auth setup-git
           # Fetch PR data using the correct command
           PR_STATE=$(gh pr view "${{ github.event.pull_request.number }}" --json state -q ".state")
-          if [ "$PR_STATE" !=
+          if [ "$PR_STATE" != "OPEN" ]; then
+            echo "❌ PR is not open. Cancelling E2E tests."
+            exit 1
+          else
+            echo "✅ PR is open. Proceeding with E2E tests."
+          fi
+
+      - name: Run E2E Tests
+        run: pytest e2etests.py
