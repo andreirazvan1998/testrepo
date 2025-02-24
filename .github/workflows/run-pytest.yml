@@ -38,10 +38,10 @@ jobs:
         run: |
           if [ ${{ steps.pytest.outcome }} == 'success' ]; then
             echo "Tests passed, setting 'tests-passed' label."
-            gh label add tests-passed ${{ github.event.pull_request.url }}
-            gh label remove tests-failed ${{ github.event.pull_request.url }}
+            gh pr edit ${{ github.event.pull_request.number }} --add-label tests-passed
+            gh pr edit ${{ github.event.pull_request.number }} --remove-label tests-failed
           else
             echo "Tests failed, setting 'tests-failed' label."
-            gh label add tests-failed ${{ github.event.pull_request.url }}
-            gh label remove tests-passed ${{ github.event.pull_request.url }}
+            gh pr edit ${{ github.event.pull_request.number }} --add-label tests-failed
+            gh pr edit ${{ github.event.pull_request.number }} --remove-label tests-passed
           fi
