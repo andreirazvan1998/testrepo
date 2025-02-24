@@ -3,17 +3,16 @@ name: Run Pytest on PR
 on:
   push:
     branches:
-      - '**'  # Runs on every push
+      - '**'  # Runs on all branches
   pull_request:
     types:
-      - ready_for_review  # Trigger when PR moves from draft to open
-  workflow_dispatch:  # Allows manual execution
+      - ready_for_review  # Trigger when PR is moved from draft to open
+  workflow_dispatch:  # Allows manual execution of tests
 
 permissions:
   pull-requests: write
 
 jobs:
-
   unit_tests:
     runs-on: ubuntu-latest
     if: |
@@ -37,7 +36,7 @@ jobs:
         id: pytest
         run: |
           echo "Running unit tests..."
-          pytest test_script.py --maxfail=1 --disable-warnings --tb=short || exit 1  # Exit explicitly if tests fail
+          pytest test_script.py --maxfail=1 --disable-warnings --tb=short
           
       - name: Check Test Result and Set Labels
         id: set_labels
@@ -68,7 +67,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Checking and handling labels and PR status..."
-
+          
           # Check if the tests failed or passed
           if [[ "$TEST_RESULT" == "failure" ]]; then
             echo "Tests failed. Adding 'tests-failed' label to PR."
