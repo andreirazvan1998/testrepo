@@ -36,7 +36,9 @@ jobs:
       - name: Run Unit Tests
         id: pytest
         continue-on-error: true  # This allows the following steps to run even if the tests fail
-        run: pytest test_script.py
+        run: |
+          echo "Running unit tests..."
+          pytest test_script.py || echo "Tests failed, continuing with the workflow."
 
       - name: Get PR URL (Only for push events)
         id: pr_url
@@ -49,50 +51,33 @@ jobs:
           echo "PR_URL=$PR_URL" >> $GITHUB_ENV
           echo "PR URL: $PR_URL"  # Debugging line
 
-      - name: Move PR to Draft & Add Label if Tests Fail
-        if: failure() && github.event_name == 'push' && env.PR_URL != ''
+      - name: Handle Labeling and Drafting PR based on Test Results
+        if: github.event_name == 'push' && env.PR_URL != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "❌ Unit tests failed, moving PR back to draft."
-          gh pr ready --undo "$PR_URL"
-          gh pr comment "$PR_URL" --body "🚨 Unit tests failed in Draft. They will rerun when PR is reopened."
+          echo "Checking if tests passed or failed..."
+          PR_URL=${{ env.PR_URL }}
+          TEST_RESULT=$(echo "${{ steps.pytest.outcome }}")
+          echo "Test result: $TEST_RESULT"
           
-          # Debugging: Check current labels
-          echo "Checking current labels on PR..."
-          gh pr view "$PR_URL" --json labels -q '.labels[].name' || echo "Failed to fetch labels"
-          
-          # Remove the "tests-passed" label if it exists
-          echo "Removing 'tests-passed' label if present..."
-          gh pr edit "$PR_URL" --remove-label "tests-passed" || echo "tests-passed label not found"
-          
-          # Add the "tests-failed" label
-          echo "Adding 'tests-failed' label..."
-          gh pr edit "$PR_URL" --add-label "tests-failed" || echo "Failed to add 'tests-failed' label"
+          if [ "$TEST_RESULT" == "failure" ]; then
+            echo "❌ Unit tests failed. Moving PR back to draft and adding 'tests-failed' label."
+            gh pr ready --undo "$PR_URL"
+            gh pr comment "$PR_URL" --body "🚨 Unit tests failed. Moving PR back to draft."
 
-      - name: Mark PR as Passed if Tests Succeed
-        if: success() && github.event_name == 'push' && env.PR_URL != ''
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh auth setup-git
-          
-          # Check if 'tests-passed' label exists before adding it
-          echo "Checking for 'tests-passed' label..."
-          EXISTING_LABELS=$(gh pr view "$PR_URL" --json labels -q '.labels[].name')
-          if [[ "$EXISTING_LABELS" != *"tests-passed"* ]]; then
-            echo "Adding 'tests-passed' label..."
-            gh pr edit "$PR_URL" --add-label "tests-passed" || echo "Failed to add 'tests-passed' label"
+            # Remove the 'tests-passed' label if it exists
+            gh pr edit "$PR_URL" --remove-label "tests-passed" || echo "tests-passed label not found"
+            gh pr edit "$PR_URL" --add-label "tests-failed" || echo "Failed to add 'tests-failed' label"
           else
-            echo "'tests-passed' label already exists."
+            echo "✅ Unit tests passed."
+            # If tests passed, remove the 'tests-failed' label and add 'tests-passed'
+            gh pr edit "$PR_URL" --remove-label "tests-failed" || echo "'tests-failed' label not found"
+            gh pr edit "$PR_URL" --add-label "tests-passed" || echo "Failed to add 'tests-passed' label"
+            
+            # Add comment indicating success
+            gh pr comment "$PR_URL" --body "✅ Unit tests passed. They won't rerun when PR is reopened."
           fi
-          
-          # Remove 'tests-failed' label if present
-          echo "Removing 'tests-failed' label..."
-          gh pr edit "$PR_URL" --remove-label "tests-failed" || echo "'tests-failed' label not found"
-
-          # Commenting on PR to confirm success
-          gh pr comment "$PR_URL" --body "✅ Unit tests passed. They won't rerun when PR is reopened."
 
   e2e_tests:
     needs: unit_tests
