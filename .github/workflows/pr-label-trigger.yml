@@ -1,0 +1,38 @@
+name: Trigger PR Test on Label Change
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
+      - unlabeled
+
+jobs:
+  trigger_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Get PR Number and Labels
+        id: get_pr_info
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name')
+          echo "PR Number: $PR_NUMBER"
+          echo "Labels: $LABELS"
+          echo "LABELS=$LABELS" >> $GITHUB_ENV
+
+      - name: Trigger Test Workflow if Label is `tests-failed`
+        run: |
+          if [[ "$LABELS" == *"tests-failed"* ]]; then
+            echo "Triggering the test run because the label is 'tests-failed'"
+            curl -X POST -u "token:${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              --data '{"ref":"refs/heads/main"}' \
+              https://api.github.com/repos/${{ github.repository }}/actions/workflows/pr-test-and-label-update.yml/dispatches
+          else
+            echo "No need to trigger tests as the label is not 'tests-failed'"
+          fi
