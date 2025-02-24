@@ -35,6 +35,7 @@ jobs:
           else
             echo "Tests failed or not run yet, running pytest"
             echo "skip_tests=false" >> $GITHUB_ENV
+          fi
 
   run_tests:
     needs: check_pr_label
@@ -47,7 +48,7 @@ jobs:
       - name: Run pytest
         run: |
           pytest tests/your_test_file.py
-          
+
   handle_labels:
     needs: run_tests
     runs-on: ubuntu-latest
