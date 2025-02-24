@@ -8,7 +8,7 @@ on:
       - reopened
       - labeled
       - unlabeled
-      - ready_for_review  # Add this to listen for when a PR is moved to "ready for review" from draft
+      - ready_for_review  # Listen for ready_for_review event
 
 jobs:
   trigger_tests:
@@ -24,7 +24,8 @@ jobs:
         id: get_pr_info
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
-          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name')
+          # Explicitly pass GH_TOKEN to gh command
+          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name' -H "Authorization: Bearer $GH_TOKEN")
           CURRENT_BRANCH=${{ github.head_ref }}  # Get the current branch of the PR
           echo "PR Number: $PR_NUMBER"
           echo "Labels: $LABELS"
