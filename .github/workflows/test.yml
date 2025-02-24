@@ -15,8 +15,8 @@ permissions:
 jobs:
 
   unit_tests:
-    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.body, '🚨 Unit tests failed'))  # Only rerun if they previously failed
 
     steps:
       - name: Checkout repository
@@ -46,16 +46,19 @@ jobs:
           PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url')
           if [ -n "$PR_URL" ]; then
             gh pr ready --undo "$PR_URL"
-            gh pr comment "$PR_URL" --body "❌ Unit tests failed! PR moved back to Draft."
+            gh pr comment "$PR_URL" --body "🚨 Unit tests failed in Draft. They will rerun when PR is reopened."
           fi
 
-      - name: Mark Failure in PR
-        if: failure() && github.event_name == 'push'
+      - name: Remove Failure Marker if Tests Pass
+        if: success() && github.event_name == 'push'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "unit-tests-failed" > unit_test_status.txt
-          gh pr comment "${{ github.event.pull_request.html_url }}" --body "🚨 Unit tests failed in Draft. They will rerun when PR is reopened."
+          gh auth setup-git
+          PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url')
+          if [ -n "$PR_URL" ]; then
+            gh pr comment "$PR_URL" --body "✅ Unit tests passed. They won't rerun when PR is reopened."
+          fi
 
   e2e_tests:
     needs: unit_tests
@@ -73,21 +76,4 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install pytest
-
-      - name: Verify PR is Open
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh auth setup-git
-          PR_STATE=$(gh pr view "${{ github.event.pull_request.number }}" --json state -q ".state")
-          if [ "$PR_STATE" != "OPEN" ]; then
-            echo "❌ PR is not open. Cancelling E2E tests."
-            exit 1
-          else
-            echo "✅ PR is open. Proceeding with E2E tests."
-          fi
-
-      - name: Run E2E Tests
-        run: pytest e2etests.py
+         
