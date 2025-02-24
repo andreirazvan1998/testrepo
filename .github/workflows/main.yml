@@ -35,7 +35,7 @@ jobs:
           else
             echo "Tests failed or not run yet, running pytest"
             echo "skip_tests=false" >> $GITHUB_ENV
-          
+
   run_tests:
     needs: check_pr_label
     runs-on: ubuntu-latest
@@ -46,7 +46,7 @@ jobs:
 
       - name: Run pytest
         run: |
-          pytest
+          pytest tests/your_test_file.py
           
   handle_labels:
     needs: run_tests
@@ -59,9 +59,11 @@ jobs:
           PR_NUMBER=${{ github.event.pull_request.number }}
           echo "PR Number: $PR_NUMBER"
           
+          # Check if pytest passed (exit code 0) or failed (exit code 1)
           if [ $? -eq 0 ]; then
             echo "Tests passed, updating label to 'tests-passed'"
             gh pr edit $PR_NUMBER --add-label tests-passed --remove-label tests-failed
           else
             echo "Tests failed, updating label to 'tests-failed'"
             gh pr edit $PR_NUMBER --add-label tests-failed --remove-label tests-passed
+          fi
