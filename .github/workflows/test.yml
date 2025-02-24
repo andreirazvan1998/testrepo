@@ -16,7 +16,7 @@ jobs:
 
   unit_tests:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.body, '🚨 Unit tests failed'))  # Only rerun if they previously failed
+    if: github.event_name == 'push' || github.event_name == 'pull_request'  # Always run on push, conditionally run on PR open
 
     steps:
       - name: Checkout repository
@@ -36,29 +36,35 @@ jobs:
         id: pytest
         run: pytest test_script.py
 
+      - name: Check if PR Exists
+        id: check_pr
+        if: github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh auth setup-git
+          PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url' || echo "")
+          if [ -n "$PR_URL" ]; then
+            echo "PR_URL=$PR_URL" >> $GITHUB_ENV
+          fi
+
       - name: Move PR to Draft if Tests Fail
-        if: failure() && github.event_name == 'push'
+        if: failure() && github.event_name == 'push' && env.PR_URL != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "❌ Unit tests failed, moving PR back to draft."
-          gh auth setup-git
-          PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url')
-          if [ -n "$PR_URL" ]; then
-            gh pr ready --undo "$PR_URL"
-            gh pr comment "$PR_URL" --body "🚨 Unit tests failed in Draft. They will rerun when PR is reopened."
-          fi
+          gh pr ready --undo "$PR_URL"
+          gh pr comment "$PR_URL" --body "🚨 Unit tests failed in Draft. They will rerun when PR is reopened."
+          echo "UNIT_TESTS_FAILED=true" >> $GITHUB_ENV
 
       - name: Remove Failure Marker if Tests Pass
-        if: success() && github.event_name == 'push'
+        if: success() && github.event_name == 'push' && env.PR_URL != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh auth setup-git
-          PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url')
-          if [ -n "$PR_URL" ]; then
-            gh pr comment "$PR_URL" --body "✅ Unit tests passed. They won't rerun when PR is reopened."
-          fi
+          gh pr comment "$PR_URL" --body "✅ Unit tests passed. They won't rerun when PR is reopened."
+          echo "UNIT_TESTS_FAILED=false" >> $GITHUB_ENV
 
   e2e_tests:
     needs: unit_tests
