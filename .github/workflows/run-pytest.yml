@@ -45,6 +45,7 @@ jobs:
         id: get_labels
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
+          echo "Fetching current labels for PR #$PR_NUMBER"
           LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels | map(.name) | join(",")')
           echo "Current labels: $LABELS"
           echo "LABELS=$LABELS" >> $GITHUB_ENV
@@ -55,11 +56,14 @@ jobs:
           echo "PR Number: $PR_NUMBER"
 
           # Obținem codul de ieșire al pytest
-          TEST_RESULT=$?
+          TEST_RESULT=${{ steps.pytest.outcome }}
           echo "Pytest exit code: $TEST_RESULT"
 
+          # Debug - afisăm etichetele curente
+          echo "Current labels: $LABELS"
+
           # Verifică dacă testele au trecut
-          if [ $TEST_RESULT -eq 0 ]; then
+          if [ "$TEST_RESULT" == "success" ]; then
             echo "Tests passed, setting 'tests-passed' label."
             # Elimină eticheta `tests-failed` dacă există
             if [[ "$LABELS" == *"tests-failed"* ]]; then
