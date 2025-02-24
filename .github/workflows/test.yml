@@ -38,6 +38,19 @@ jobs:
         run: |
           echo "Running unit tests..."
           pytest test_script.py --maxfail=1 --disable-warnings --tb=short || echo "Tests failed" > pytest-status.txt
+          echo "Test result: $(cat pytest-status.txt)"
+
+      - name: Check if Tests Failed
+        id: check_test_result
+        run: |
+          echo "Checking if tests passed or failed..."
+          if [[ -f pytest-status.txt ]]; then
+            echo "Test result: failure"
+            echo "TEST_RESULT=failure" >> $GITHUB_ENV
+          else
+            echo "Test result: success"
+            echo "TEST_RESULT=success" >> $GITHUB_ENV
+          fi
 
       - name: Get PR URL (Only for push events)
         id: pr_url
@@ -77,20 +90,12 @@ jobs:
         run: |
           echo "Checking if tests passed or failed..."
 
-          # Check if pytest passed or failed by checking the result of pytest-status.txt
-          if [[ -f pytest-status.txt ]]; then
-            TEST_RESULT="failure"
-          else
-            TEST_RESULT="success"
-          fi
-
-          echo "Test result: $TEST_RESULT"
-
-          # Add the appropriate label and comment to the PR based on test result
+          # Check if tests passed or failed using TEST_RESULT from environment variable
           if [[ "$TEST_RESULT" == "failure" ]]; then
             echo "Tests failed. Adding 'tests-failed' label to PR."
             gh pr edit "$PR_URL" --add-label "tests-failed"
             gh pr comment "$PR_URL" --body "❌ Unit tests failed! Please check the test logs."
+            exit 1  # Explicitly exit with error to indicate failure in the job
           else
             echo "Tests passed. Adding 'tests-passed' label to PR."
             gh pr edit "$PR_URL" --add-label "tests-passed"
