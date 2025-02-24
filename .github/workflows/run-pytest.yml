@@ -25,13 +25,16 @@ jobs:
           PR_NUMBER=${{ github.event.pull_request.number }}
           LABEL=$(gh pr view $PR_NUMBER --json labels -q ".labels[0].name")
           echo "Current label: $LABEL"
-          
-          if [[ "$LABEL" == "tests-passed" ]]; then
-            echo "Tests already passed, skipping pytest."
-            echo "run_tests=false" >> $GITHUB_OUTPUT
-          else
-            echo "Tests need to run."
+
+          if [[ "${{ github.event.action }}" == "synchronize" ]]; then
+            echo "Code updated, running tests."
             echo "run_tests=true" >> $GITHUB_OUTPUT
+          elif [[ "$LABEL" == "tests-failed" ]]; then
+            echo "PR is open and tests previously failed. Running tests."
+            echo "run_tests=true" >> $GITHUB_OUTPUT
+          else
+            echo "Skipping tests as PR is open and tests already passed."
+            echo "run_tests=false" >> $GITHUB_OUTPUT
 
   run_pytest:
     needs: check_label
