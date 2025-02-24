@@ -56,7 +56,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Checking if tests passed or failed..."
-          PR_URL=${{ env.PR_URL }}
           
           # Check the test result by inspecting the pytest exit status
           TEST_RESULT=$(if [ -f pytest-status.txt ]; then cat pytest-status.txt; else echo "failure"; fi)
