@@ -13,7 +13,7 @@ permissions:
   pull-requests: write
 
 jobs:
-
+  
   e2e_tests:
     needs: unit_tests
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
