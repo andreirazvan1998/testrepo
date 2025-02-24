@@ -50,6 +50,26 @@ jobs:
           echo "PR_URL=$PR_URL" >> $GITHUB_ENV
           echo "PR URL: $PR_URL"  # Debugging line
 
+      - name: Check and Create Label if Necessary
+        if: github.event_name == 'push' && env.PR_URL != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Checking and creating labels if necessary..."
+
+          # Check if the label exists, create it if it doesn't
+          LABEL_EXISTS=$(gh label list --json name -q '.[].name' | grep -w 'tests-failed' || echo "no")
+          if [[ "$LABEL_EXISTS" == "no" ]]; then
+            echo "Label 'tests-failed' does not exist. Creating it now..."
+            gh label create "tests-failed" --color "e11d21" --description "Tests failed"
+          fi
+
+          LABEL_EXISTS=$(gh label list --json name -q '.[].name' | grep -w 'tests-passed' || echo "no")
+          if [[ "$LABEL_EXISTS" == "no" ]]; then
+            echo "Label 'tests-passed' does not exist. Creating it now..."
+            gh label create "tests-passed" --color "0e8a16" --description "Tests passed"
+          fi
+
       - name: Handle Labeling and Drafting PR based on Test Results
         if: github.event_name == 'push' && env.PR_URL != ''
         env:
