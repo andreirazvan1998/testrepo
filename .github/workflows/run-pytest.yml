@@ -13,46 +13,38 @@ jobs:
   check_label:
     runs-on: ubuntu-latest
     outputs:
-      should_run_tests: ${{ steps.check.outputs.run_tests }}
+      run_tests: ${{ steps.check_label.outputs.run_tests }}  # Output to determine if pytest should run
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Authenticate with GitHub CLI
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+      - name: Get PR Number
+        id: get_pr
+        run: echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
 
-      - name: Get PR Status and Labels
-        id: check
+      - name: Get current labels
+        id: get_labels
         run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          PR_STATE=$(gh pr view $PR_NUMBER --json state -q '.state')
-          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels | map(.name) | join(" ")')
-
-          echo "PR Number: $PR_NUMBER"
-          echo "PR State: $PR_STATE"
+          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name')
           echo "Current labels: $LABELS"
+          echo "LABELS=$LABELS" >> $GITHUB_ENV
 
-          if [[ "$PR_STATE" == "OPEN" && "$LABELS" == *"tests-failed"* ]]; then
-            echo "PR is OPEN and has 'tests-failed'. Running tests."
+      - name: Check if tests should run
+        id: check_label
+        run: |
+          if [[ "${{ github.event.pull_request.state }}" == "open" ]] && [[ "$LABELS" == *"tests-failed"* ]]; then
+            echo "Tests should run (PR is open and label is tests-failed)"
             echo "run_tests=true" >> $GITHUB_ENV
-            echo "run_tests=true" >> $GITHUB_OUTPUT
-          elif [[ "$PR_STATE" == "OPEN" && "$LABELS" == *"tests-passed"* ]]; then
-            echo "PR is OPEN and tests are already passed. Skipping tests."
-            echo "run_tests=false" >> $GITHUB_ENV
-            echo "run_tests=false" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event.action }}" == "synchronize" ]]; then
-            echo "Code updated, running tests."
-            echo "run_tests=true" >> $GITHUB_ENV
-            echo "run_tests=true" >> $GITHUB_OUTPUT
           else
-            echo "No need to run tests."
+            echo "Tests should NOT run (PR is not open or label is not tests-failed)"
             echo "run_tests=false" >> $GITHUB_ENV
-            echo "run_tests=false" >> $GITHUB_OUTPUT
-
+          fi
+          
   run_pytest:
     needs: check_label
-    if: needs.check_label.outputs.should_run_tests == 'true'
     runs-on: ubuntu-latest
+    if: ${{ needs.check_label.outputs.run_tests == 'true' }}  # Run only if check_label says so
     outputs:
       result: ${{ steps.pytest.outcome }}
 
@@ -72,7 +64,7 @@ jobs:
 
       - name: Run pytest
         id: pytest
-        continue-on-error: true
+        continue-on-error: true  # Continue even if tests fail
         run: |
           pytest test_script.py
         shell: bash
@@ -80,7 +72,7 @@ jobs:
   update_label:
     needs: run_pytest
     runs-on: ubuntu-latest
-    if: always()
+    if: always()  # This will run no matter the outcome of pytest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -95,7 +87,7 @@ jobs:
       - name: Get current labels
         id: get_labels
         run: |
-          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels | map(.name) | join(" ")')
+          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name')
           echo "Current labels: $LABELS"
           echo "LABELS=$LABELS" >> $GITHUB_ENV
 
