@@ -23,6 +23,8 @@ jobs:
 
       - name: Check PR label and decide whether to run pytest
         id: check_label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Add the token for authentication
         run: |
           PR_LABEL=$(gh pr view ${{ github.event.pull_request.number }} --json labels -q ".labels[0].name")
           echo "Current label: $PR_LABEL"
@@ -48,10 +50,10 @@ jobs:
   handle_labels:
     needs: run_tests
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Add the token for authentication
     steps:
       - name: Set PR label based on pytest result
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
           echo "PR Number: $PR_NUMBER"
