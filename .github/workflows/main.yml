@@ -28,6 +28,7 @@ jobs:
         run: |
           PR_LABEL=$(gh pr view ${{ github.event.pull_request.number }} --json labels -q ".labels[0].name")
           echo "Current label: $PR_LABEL"
+          
           if [ "$PR_LABEL" == "tests-passed" ]; then
             echo "Tests passed, skipping pytest execution"
             echo "skip_tests=true" >> $GITHUB_ENV
@@ -57,6 +58,7 @@ jobs:
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
           echo "PR Number: $PR_NUMBER"
+          
           if [ $? -eq 0 ]; then
             echo "Tests passed, updating label to 'tests-passed'"
             gh pr edit $PR_NUMBER --add-label tests-passed --remove-label tests-failed
