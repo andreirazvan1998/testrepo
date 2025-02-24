@@ -1,6 +1,9 @@
 name: Trigger PR Test on Label Change
 
 on:
+  push:
+    branches:
+      - main  # Trigger on every push to the main branch (adjust to your branch if needed)
   pull_request:
     types:
       - opened
@@ -8,7 +11,7 @@ on:
       - reopened
       - labeled
       - unlabeled
-      - ready_for_review  # Listen for ready_for_review event
+      - ready_for_review  # Trigger when PR is moved to 'Ready for Review'
 
 jobs:
   trigger_tests:
@@ -26,12 +29,20 @@ jobs:
           PR_NUMBER=${{ github.event.pull_request.number }}
           # Explicitly set GH_TOKEN in the environment variable for gh
           export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name')
           CURRENT_BRANCH=${{ github.head_ref }}  # Get the current branch of the PR
           echo "PR Number: $PR_NUMBER"
+          echo "Labels: $LABELS"
           echo "Current Branch: $CURRENT_BRANCH"
+          echo "LABELS=$LABELS" >> $GITHUB_ENV
           echo "CURRENT_BRANCH=$CURRENT_BRANCH" >> $GITHUB_ENV
 
-      - name: Trigger Test Workflow Unconditionally
+      - name: Trigger Test Workflow if Label is `tests-failed` or PR is Ready for Review
         run: |
-          echo "Triggering the test run unconditionally"
-          gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}
+          # Trigger on PR moved to "Ready for Review" or if label is "tests-failed"
+          if [[ "$LABELS" == *"tests-failed"* ]] || [[ "${{ github.event.pull_request.state }}" == "open" && "${{ github.event.pull_request.draft }}" == "false" ]]; then
+            echo "Triggering the test run because the label is 'tests-failed' or PR is Ready for Review"
+            gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}
+          else
+            echo "No need to trigger tests as the label is not 'tests-failed' and PR is not Ready for Review"
+          fi
