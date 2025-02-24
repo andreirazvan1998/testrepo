@@ -17,7 +17,7 @@ jobs:
         run: |
           # Clear any existing GH_TOKEN environment variable before using the GitHub CLI
           unset GH_TOKEN
-          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
+          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
 
       - name: Log PR information
         run: |
@@ -28,9 +28,4 @@ jobs:
       - name: Trigger Test Workflow
         run: |
           echo "Triggering test workflow because the PR is opened or ready for review."
-          curl -X POST \
-          -H "Accept: application/vnd.github.v3+json" \
-          -H "Authorization: token YOUR_GITHUB_TOKEN" \
-          -d '{"ref": "refs/heads/BRANCH_NAME"}' \
-          https://api.github.com/repos/OWNER/REPO/actions/workflows/pr-test-and-label-update.yml/dispatches
-
+          gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}
