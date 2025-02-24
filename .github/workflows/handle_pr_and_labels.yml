@@ -67,7 +67,9 @@ jobs:
       - name: Add 'tests-passed' or 'tests-failed' Label Based on Test Result
         run: |
           # Check the pytest exit code from the previous job
-          if [[ "${{ needs.unit_tests.outputs.test-result }}" == "success" ]]; then
+          TEST_RESULT="${{ needs.unit_tests.outputs.test-result }}"
+          
+          if [ "$TEST_RESULT" == "success" ]; then
             echo "Tests passed. Adding 'tests-passed' label."
             gh pr edit "$PR_URL" --add-label "tests-passed" || echo "Label 'tests-passed' already exists."
             gh pr comment "$PR_URL" --body "✅ Unit tests passed. PR is ready for review."
