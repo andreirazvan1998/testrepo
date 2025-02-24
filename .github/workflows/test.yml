@@ -77,6 +77,8 @@ jobs:
             
             # Add comment indicating success
             gh pr comment "$PR_URL" --body "✅ Unit tests passed. They won't rerun when PR is reopened."
+          
+          fi  # Close the if block
 
   e2e_tests:
     needs: unit_tests
