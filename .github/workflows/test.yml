@@ -16,11 +16,9 @@ jobs:
 
   unit_tests:
     runs-on: ubuntu-latest
-    # Temporarily remove the condition to ensure the tests run
-    # if: |
-    #   github.event_name == 'push' || 
-    #   (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'tests-passed'))
-
+    if: |
+      github.event_name == 'push' || 
+      (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'tests-passed'))
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -32,16 +30,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          echo "Installing dependencies..."  # Debugging line
           python -m pip install --upgrade pip
           pip install pytest
 
       - name: Run Unit Tests
         id: pytest
         run: |
-          echo "Running unit tests..."  # Debugging line
+          echo "Running unit tests..."
           pytest test_script.py || echo "Tests failed" > pytest-status.txt
-          cat pytest-status.txt  # Debugging line to show contents of pytest-status.txt
 
       - name: Get PR URL (Only for push events)
         id: pr_url
@@ -60,15 +56,59 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Checking if tests passed or failed..."
-          
-          # Debugging the file contents
-          echo "Contents of pytest-status.txt: $(cat pytest-status.txt)"
-          
-          # Check if pytest passed or failed by checking the result file
-          if test -f pytest-status.txt && grep -q "Tests failed" pytest-status.txt; then
-            echo "❌ Unit tests failed. Moving PR back to draft and adding 'tests-failed' label."
-            gh pr ready --undo "$PR_URL"
-            gh pr comment "$PR_URL" --body "🚨 Unit tests failed. Moving PR back to draft."
 
-            # Remove the 'tests-passed' label if it exists
-            gh
+          # Check if pytest passed or failed by checking the result of pytest-status.txt
+          if [[ -f pytest-status.txt ]]; then
+            TEST_RESULT="failure"
+          else
+            TEST_RESULT="success"
+          fi
+
+          echo "Test result: $TEST_RESULT"
+
+          # Add the appropriate label and comment to the PR based on test result
+          if [[ "$TEST_RESULT" == "failure" ]]; then
+            echo "Tests failed. Adding 'tests-failed' label to PR."
+            gh pr edit "$PR_URL" --add-label "tests-failed"
+            gh pr comment "$PR_URL" --body "❌ Unit tests failed! Please check the test logs."
+          else
+            echo "Tests passed. Adding 'tests-passed' label to PR."
+            gh pr edit "$PR_URL" --add-label "tests-passed"
+            gh pr comment "$PR_URL" --body "✅ Unit tests passed. PR is ready for review."
+          fi
+
+  e2e_tests:
+    needs: unit_tests
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Verify PR is Open
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh auth setup-git
+          # Fetch PR data using the correct command
+          PR_STATE=$(gh pr view "${{ github.event.pull_request.number }}" --json state -q ".state")
+          if [ "$PR_STATE" != "OPEN" ]; then
+            echo "❌ PR is not open. Cancelling E2E tests."
+            exit 1
+          else
+            echo "✅ PR is open. Proceeding with E2E tests."
+          fi
+
+      - name: Run E2E Tests
+        run: pytest e2etests.py
