@@ -48,10 +48,4 @@ jobs:
 
       - name: Trigger Test Workflow if Label is `tests-failed`
         run: |
-          # Only trigger tests if label is 'tests-failed'
-          if [[ "$LABELS" == *"tests-failed"* ]]; then
-            echo "Triggering the test run because the label is 'tests-failed'"
-            gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}
-          else
-            echo "No need to trigger tests as the label is not 'tests-failed'"
-          fi
+          gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}
