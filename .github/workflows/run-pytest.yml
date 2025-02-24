@@ -8,8 +8,11 @@ on:
       - reopened
 
 jobs:
-  run_pytest:
+  unit_tests:
     runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' || 
+      (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'tests-passed'))
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -24,57 +27,53 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest
 
-      - name: Run pytest
+      - name: Run Unit Tests
         id: pytest
-        continue-on-error: true  # Permite continuarea job-ului chiar dacă testele pică
         run: |
-          pytest test_script.py
-          echo "Test status: $?"  # Afișează statusul testului
-
-  update_label:
-    needs: run_pytest
-    runs-on: ubuntu-latest
-    if: ${{ always() }}  # Se asigură că job-ul de actualizare a etichetei se va rula întotdeauna
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Token-ul GitHub pentru modificarea etichetelor
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Get current labels
-        id: get_labels
-        run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels | map(.name) | join(",")')
-          echo "Current labels: $LABELS"
-          echo "LABELS=$LABELS" >> $GITHUB_ENV
-
-      - name: Set PR label based on pytest result
-        run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          echo "PR Number: $PR_NUMBER"
+          echo "Running unit tests..."
+          pytest test_script.py --maxfail=1 --disable-warnings --tb=short
           
-          # Verificăm rezultatul testelor
-          if [ ${{ steps.pytest.outcome }} == 'success' ]; then
-            echo "Tests passed, updating label to 'tests-passed'."
-            # Îndepărtăm eticheta `tests-failed` dacă există
-            if [[ "$LABELS" == *"tests-failed"* ]]; then
-              echo "Removing 'tests-failed' label"
-              gh pr edit $PR_NUMBER --remove-label tests-failed
-            fi
-            # Adăugăm eticheta `tests-passed` doar dacă nu există deja
-            if [[ "$LABELS" != *"tests-passed"* ]]; then
-              gh pr edit $PR_NUMBER --add-label tests-passed
-            fi
+      - name: Check Test Result and Set Labels
+        id: set_labels
+        run: |
+          echo "Checking if tests passed or failed..."
+          if [ $? -ne 0 ]; then
+            echo "Test result: failure"
+            echo "TEST_RESULT=failure" >> $GITHUB_ENV
           else
-            echo "Tests failed, updating label to 'tests-failed'."
-            # Îndepărtăm eticheta `tests-passed` dacă există
-            if [[ "$LABELS" == *"tests-passed"* ]]; then
-              echo "Removing 'tests-passed' label"
-              gh pr edit $PR_NUMBER --remove-label tests-passed
-            fi
-            # Adăugăm eticheta `tests-failed` doar dacă nu există deja
-            if [[ "$LABELS" != *"tests-failed"* ]]; then
-              gh pr edit $PR_NUMBER --add-label tests-failed
-            fi
+            echo "Test result: success"
+            echo "TEST_RESULT=success" >> $GITHUB_ENV
+          fi
+
+      - name: Get PR URL (Only for push events)
+        id: pr_url
+        if: github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh auth setup-git
+          PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url' || echo "")
+          echo "PR_URL=$PR_URL" >> $GITHUB_ENV
+          echo "PR URL: $PR_URL"  # Debugging line
+
+      - name: Handle Labeling and Drafting PR based on Test Results
+        if: github.event_name == 'push' && env.PR_URL != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Checking and handling labels and PR status..."
+          
+          # Check if the tests failed or passed
+          if [[ "$TEST_RESULT" == "failure" ]]; then
+            echo "Tests failed. Adding 'tests-failed' label to PR."
+            gh pr edit "$PR_URL" --add-label "tests-failed"
+            gh pr comment "$PR_URL" --body "❌ Unit tests failed! Please check the test logs."
+
+            # Move the PR back to draft if the tests failed
+            gh pr ready --undo "$PR_URL"
+            exit 1  # Explicitly exit with error to indicate failure, this ensures the job fails
+          else
+            echo "Tests passed. Adding 'tests-passed' label to PR."
+            gh pr edit "$PR_URL" --add-label "tests-passed"
+            gh pr comment "$PR_URL" --body "✅ Unit tests passed. PR is ready for review."
           fi
