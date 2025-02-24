@@ -58,7 +58,7 @@ jobs:
           TEST_RESULT=$?
           echo "Pytest exit code: $TEST_RESULT"
 
-          # Verifică statusul pytest
+          # Verifică dacă testele au trecut
           if [ $TEST_RESULT -eq 0 ]; then
             echo "Tests passed, setting 'tests-passed' label."
             # Elimină eticheta `tests-failed` dacă există
