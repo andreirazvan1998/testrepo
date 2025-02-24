@@ -57,24 +57,24 @@ jobs:
           # Dacă testele au trecut
           if [ ${{ steps.pytest.outcome }} == 'success' ]; then
             echo "Tests passed, setting 'tests-passed' label."
-            # Dacă există deja 'tests-failed', o eliminăm
+            # Elimină eticheta `tests-failed` dacă există
             if [[ "$LABELS" == *"tests-failed"* ]]; then
               echo "Removing 'tests-failed' label"
               gh pr edit $PR_NUMBER --remove-label tests-failed
             fi
-            # Adăugăm 'tests-passed' dacă nu există deja
+            # Adăugăm `tests-passed` doar dacă nu există deja
             if [[ "$LABELS" != *"tests-passed"* ]]; then
               gh pr edit $PR_NUMBER --add-label tests-passed
             fi
           # Dacă testele au eșuat
           else
             echo "Tests failed, setting 'tests-failed' label."
-            # Dacă există deja 'tests-passed', o eliminăm
+            # Elimină eticheta `tests-passed` dacă există
             if [[ "$LABELS" == *"tests-passed"* ]]; then
               echo "Removing 'tests-passed' label"
               gh pr edit $PR_NUMBER --remove-label tests-passed
             fi
-            # Adăugăm 'tests-failed' dacă nu există deja
+            # Adăugăm `tests-failed` doar dacă nu există deja
             if [[ "$LABELS" != *"tests-failed"* ]]; then
               gh pr edit $PR_NUMBER --add-label tests-failed
             fi
