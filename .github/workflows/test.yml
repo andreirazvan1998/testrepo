@@ -35,11 +35,10 @@ jobs:
 
       - name: Run Unit Tests
         id: pytest
-        continue-on-error: true  # This allows the following steps to run even if the tests fail
         run: |
           echo "Running unit tests..."
-          pytest test_script.py || echo "Tests failed, continuing with the workflow."
-
+          pytest test_script.py
+          
       - name: Get PR URL (Only for push events)
         id: pr_url
         if: github.event_name == 'push'
@@ -58,7 +57,7 @@ jobs:
         run: |
           echo "Checking if tests passed or failed..."
           PR_URL=${{ env.PR_URL }}
-          TEST_RESULT=$(echo "${{ steps.pytest.outcome }}")
+          TEST_RESULT=${{ steps.pytest.outcome }}
           echo "Test result: $TEST_RESULT"
           
           if [ "$TEST_RESULT" == "failure" ]; then
@@ -77,7 +76,6 @@ jobs:
             
             # Add comment indicating success
             gh pr comment "$PR_URL" --body "✅ Unit tests passed. They won't rerun when PR is reopened."
-          fi
 
   e2e_tests:
     needs: unit_tests
