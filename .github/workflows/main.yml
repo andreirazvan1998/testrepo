@@ -39,36 +39,14 @@ jobs:
             echo "::set-output name=skip_tests::false"
           fi
 
-  unit_tests:
+  trigger_pytest:
     needs: check_label_and_run_tests
     runs-on: ubuntu-latest
-    if: steps.check_label.outputs.skip_tests != 'true'  # Skip if tests were previously passed
+    if: steps.check_label.outputs.skip_tests != 'true'  # Trigger pytest only if tests need to be run
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Trigger Pytest Workflow
+        uses: peter-evans/workflow-dispatch@v1
         with:
-          python-version: '3.9'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest
-
-      - name: Run Unit Tests
-        id: pytest
-        run: pytest test_script.py
-
-      - name: Label PR as 'tests-passed' if tests pass
-        if: success()
-        run: |
-          gh pr edit "${{ github.event.pull_request.number }}" --add-label "tests-passed"
-          gh pr edit "${{ github.event.pull_request.number }}" --remove-label "tests-failed"
-
-      - name: Label PR as 'tests-failed' if tests fail
-        if: failure()
-        run: |
-          gh pr edit "${{ github.event.pull_request.number }}" --add-label "tests-failed"
-          gh pr edit "${{ github.event.pull_request.number }}" --remove-label "tests-passed"
+          repository: ${{ github.repository }}
+          workflow: run-pytest.yml  # Path to your pytest workflow file
+          ref: ${{ github.sha }}
