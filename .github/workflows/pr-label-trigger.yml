@@ -36,9 +36,13 @@ jobs:
 
       - name: Trigger Test Workflow
         run: |
-          # Always trigger tests on PR changes
-          echo "Triggering the test run"
-          curl -X POST -u "token:${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            --data '{"ref":"refs/heads/'"${CURRENT_BRANCH}"'"}' \
-            https://api.github.com/repos/${{ github.repository }}/actions/workflows/pr-test-and-label-update.yml/dispatches
+          # Check if the PR is open and the label contains 'tests-failed'
+          if [[ "${{ github.event.pull_request.state }}" == "open" ]] && [[ "$LABELS" == *"tests-failed"* ]]; then
+            echo "Triggering the test run because the label is 'tests-failed'"
+            curl -X POST -u "token:${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              --data '{"ref":"refs/heads/'"${CURRENT_BRANCH}"'"}' \
+              https://api.github.com/repos/${{ github.repository }}/actions/workflows/pr-test-and-label-update.yml/dispatches
+          else
+            echo "No need to trigger tests as the label is not 'tests-failed' or PR is not open"
+          fi
