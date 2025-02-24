@@ -1,10 +1,12 @@
 name: Run Pytest
 
 on:
-  workflow_run:
-    workflows: ["Main Workflow"]
-    types:
-      - completed
+  workflow_dispatch:
+    inputs:
+      run_pytest:
+        description: 'Run Pytest'
+        required: true
+        default: 'true'
 
 jobs:
   pytest_execution:
@@ -29,12 +31,11 @@ jobs:
         run: |
           pytest test_script.py
           echo "Test status: $?"
-        
+
       - name: Set PR label based on pytest result
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Checking pytest result..."
           if [ ${{ steps.pytest.outcome }} == 'success' ]; then
             echo "Tests passed, setting 'tests-passed' label."
             gh label add tests-passed ${{ github.event.pull_request.url }}

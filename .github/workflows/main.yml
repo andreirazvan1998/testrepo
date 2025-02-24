@@ -8,10 +8,10 @@ on:
       - reopened
       - ready_for_review
 
-  workflow_dispatch:  # Allow manual execution for testing
+  workflow_dispatch:  # Allows manual trigger for testing
 
 jobs:
-  handle_pr:
+  check_pr_label:
     runs-on: ubuntu-latest
 
     steps:
@@ -37,9 +37,9 @@ jobs:
           fi
 
   run_tests:
-    needs: handle_pr
+    needs: check_pr_label
     runs-on: ubuntu-latest
-    if: needs.handle_pr.outputs.skip_tests == 'false'  # Only run pytest if it's not skipped
+    if: needs.check_pr_label.outputs.skip_tests == 'false'  # Only run pytest if not skipped
     steps:
       - name: Trigger pytest workflow
         uses: peter-evans/workflow-dispatch@v1
@@ -52,7 +52,7 @@ jobs:
   e2e_tests:
     needs: run_tests
     runs-on: ubuntu-latest
-    if: needs.handle_pr.outputs.skip_tests == 'true'  # Run e2e tests only if pytest was skipped
+    if: needs.check_pr_label.outputs.skip_tests == 'true'  # Run e2e tests only if pytest is skipped
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
