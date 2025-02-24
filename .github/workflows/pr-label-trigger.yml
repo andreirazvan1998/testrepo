@@ -8,6 +8,7 @@ on:
       - reopened
       - labeled
       - unlabeled
+      - ready_for_review  # Add this to listen for when a PR is moved to "ready for review" from draft
 
 jobs:
   trigger_tests:
