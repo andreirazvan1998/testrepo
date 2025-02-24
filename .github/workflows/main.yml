@@ -8,8 +8,6 @@ on:
       - reopened
       - ready_for_review
 
-  workflow_dispatch:  # Allows manual trigger for testing
-
 jobs:
   check_pr_label:
     runs-on: ubuntu-latest
@@ -34,29 +32,32 @@ jobs:
           else
             echo "Tests failed or not run yet, running pytest"
             echo "skip_tests=false" >> $GITHUB_ENV
-
+          
   run_tests:
     needs: check_pr_label
     runs-on: ubuntu-latest
     if: needs.check_pr_label.outputs.skip_tests == 'false'  # Only run pytest if not skipped
     steps:
-      - name: Trigger pytest workflow
-        uses: peter-evans/workflow-dispatch@v1
-        with:
-          workflow: run-pytest.yml
-          ref: main
-          inputs:
-            run_pytest: true
-
-  e2e_tests:
-    needs: run_tests
-    runs-on: ubuntu-latest
-    if: needs.check_pr_label.outputs.skip_tests == 'true'  # Run e2e tests only if pytest is skipped
-    steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Run E2E tests
+      - name: Run pytest
         run: |
-          # Add your E2E tests commands here
-          echo "Running E2E tests..."
+          pytest
+          
+  handle_labels:
+    needs: run_tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set PR label based on pytest result
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          echo "PR Number: $PR_NUMBER"
+          if [ $? -eq 0 ]; then
+            echo "Tests passed, updating label to 'tests-passed'"
+            gh pr edit $PR_NUMBER --add-label tests-passed --remove-label tests-failed
+          else
+            echo "Tests failed, updating label to 'tests-failed'"
+            gh pr edit $PR_NUMBER --add-label tests-failed --remove-label tests-passed
