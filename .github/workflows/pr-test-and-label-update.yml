@@ -1,15 +1,12 @@
-
 name: PR Test and Label Update
 
 on:
-  workflow_dispatch:  # Add this line to allow manual trigger or external trigger via API
+  workflow_dispatch:  # Allow manual trigger or external trigger via API
   pull_request:
     types:
       - opened
       - synchronize
       - reopened
-
-# Your jobs and steps here...
 
 jobs:
   check_label:
@@ -28,6 +25,8 @@ jobs:
       - name: Get current labels
         id: get_labels
         run: |
+          # Explicitly set the GH_TOKEN for GitHub CLI
+          export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
           LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name')
           echo "Current labels: $LABELS"
           echo "LABELS=$LABELS" >> $GITHUB_ENV
@@ -41,8 +40,7 @@ jobs:
           else
             echo "Tests should NOT run (PR is not open or label is not tests-failed)"
             echo "run_tests=false" >> $GITHUB_ENV
-          fi
-          
+
   run_pytest:
     needs: check_label
     runs-on: ubuntu-latest
@@ -89,6 +87,8 @@ jobs:
       - name: Get current labels
         id: get_labels
         run: |
+          # Explicitly set the GH_TOKEN for GitHub CLI
+          export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
           LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name')
           echo "Current labels: $LABELS"
           echo "LABELS=$LABELS" >> $GITHUB_ENV
