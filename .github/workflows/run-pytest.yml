@@ -64,7 +64,10 @@ jobs:
             fi
             # Adăugăm `tests-passed` doar dacă nu există deja
             if [[ "$LABELS" != *"tests-passed"* ]]; then
+              echo "Adding 'tests-passed' label"
               gh pr edit $PR_NUMBER --add-label tests-passed
+            else
+              echo "'tests-passed' label already present"
             fi
           else
             echo "Tests failed, setting 'tests-failed' label."
@@ -75,6 +78,9 @@ jobs:
             fi
             # Adăugăm `tests-failed` doar dacă nu există deja
             if [[ "$LABELS" != *"tests-failed"* ]]; then
+              echo "Adding 'tests-failed' label"
               gh pr edit $PR_NUMBER --add-label tests-failed
+            else
+              echo "'tests-failed' label already present"
             fi
           fi
