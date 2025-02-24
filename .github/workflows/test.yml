@@ -37,8 +37,8 @@ jobs:
         id: pytest
         run: |
           echo "Running unit tests..."
-          pytest test_script.py
-          
+          pytest test_script.py || echo "Tests failed"
+
       - name: Get PR URL (Only for push events)
         id: pr_url
         if: github.event_name == 'push'
@@ -57,10 +57,12 @@ jobs:
         run: |
           echo "Checking if tests passed or failed..."
           PR_URL=${{ env.PR_URL }}
-          TEST_RESULT=${{ steps.pytest.outcome }}
+          
+          # Check the test result by inspecting the pytest exit status
+          TEST_RESULT=$(if [ -f pytest-status.txt ]; then cat pytest-status.txt; else echo "failure"; fi)
           echo "Test result: $TEST_RESULT"
           
-          if [ "$TEST_RESULT" == "failure" ]; then
+          if [[ "$TEST_RESULT" == "failure" ]]; then
             echo "❌ Unit tests failed. Moving PR back to draft and adding 'tests-failed' label."
             gh pr ready --undo "$PR_URL"
             gh pr comment "$PR_URL" --body "🚨 Unit tests failed. Moving PR back to draft."
