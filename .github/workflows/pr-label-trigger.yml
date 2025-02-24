@@ -3,7 +3,7 @@ name: Trigger PR Test on Label Change
 on:
   pull_request:
     types:
-      - opened  # Only trigger when the PR is moved to 'open'
+      - opened  # Trigger only when the PR is opened
 
 jobs:
   trigger_tests:
@@ -15,23 +15,16 @@ jobs:
       - name: Set GH_TOKEN environment variable
         run: echo "GH_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
 
-      - name: Get PR Number and Labels
+      - name: Get PR Number
         id: get_pr_info
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
-          # Explicitly set GH_TOKEN in the environment variable for gh
-          export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
           CURRENT_BRANCH=${{ github.head_ref }}  # Get the current branch of the PR
           echo "PR Number: $PR_NUMBER"
           echo "Current Branch: $CURRENT_BRANCH"
           echo "CURRENT_BRANCH=$CURRENT_BRANCH" >> $GITHUB_ENV
 
-      - name: Trigger Test Workflow if PR is Open
+      - name: Trigger Test Workflow (Unconditionally)
         run: |
-          # Only trigger if PR is in 'open' state
-          if [[ "${{ github.event.pull_request.state }}" == "open" ]]; then
-            echo "Triggering the test run because the PR is open"
-            gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}
-          else
-            echo "PR is not open. Skipping test trigger."
-          fi
+          echo "Triggering the test run because the PR is opened"
+          gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}
