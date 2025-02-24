@@ -50,21 +50,26 @@ jobs:
           fi
           echo "PR_URL=$PR_URL" >> $GITHUB_ENV
 
-      - name: Remove existing labels
+      - name: Check for existing labels and replace them
         run: |
+          # Check if 'tests-passed' label exists
           existing_labels=$(gh pr view "$PR_URL" --json labels -q '.labels[].name')
-          for label in $existing_labels; do
-            echo "Removing label: $label"
-            gh pr edit "$PR_URL" --remove-label "$label"
-          done
-
-      - name: Add 'tests-passed' or 'tests-failed' Label Based on Test Result
-        run: |
-          # Check the pytest exit code (whether it passed or failed)
-          if [ "${{ steps.pytest.outcome }}" == "success" ]; then
-            echo "Tests passed. Adding 'tests-passed' label."
-            gh pr edit "$PR_URL" --add-label "tests-passed"
+          if echo "$existing_labels" | grep -q "tests-passed"; then
+            if [ "${{ steps.pytest.outcome }}" != "success" ]; then
+              echo "Tests failed. Replacing 'tests-passed' with 'tests-failed' label."
+              gh pr edit "$PR_URL" --remove-label "tests-passed" --add-label "tests-failed"
+            fi
+          elif echo "$existing_labels" | grep -q "tests-failed"; then
+            if [ "${{ steps.pytest.outcome }}" == "success" ]; then
+              echo "Tests passed. Replacing 'tests-failed' with 'tests-passed' label."
+              gh pr edit "$PR_URL" --remove-label "tests-failed" --add-label "tests-passed"
+            fi
           else
-            echo "Tests failed. Adding 'tests-failed' label."
-            gh pr edit "$PR_URL" --add-label "tests-failed"
+            if [ "${{ steps.pytest.outcome }}" == "success" ]; then
+              echo "Tests passed. Adding 'tests-passed' label."
+              gh pr edit "$PR_URL" --add-label "tests-passed"
+            else
+              echo "Tests failed. Adding 'tests-failed' label."
+              gh pr edit "$PR_URL" --add-label "tests-failed"
+            fi
           fi
