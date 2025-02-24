@@ -1,14 +1,15 @@
-name: PR Test and Label Update
+name: Run Pytest
 
 on:
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
+  workflow_dispatch:
+    inputs:
+      run_pytest:
+        description: 'Run Pytest'
+        required: true
+        default: 'true'
 
 jobs:
-  run_tests:
+  pytest_execution:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,33 +23,26 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          pip install pytest
 
       - name: Run pytest
         id: pytest
         run: |
-          pytest tests/your_test_file.py || echo "Pytest failed with exit code $?" # Run pytest, capture failure if any
-
-  update_label:
-    needs: run_tests
-    runs-on: ubuntu-latest
-    if: ${{ always() }}  # Always runs, regardless of test result
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # GitHub Token to update labels
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+          pytest test_script.py
+          echo "Test status: $?"
 
       - name: Set PR label based on pytest result
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
-          echo "PR Number: $PR_NUMBER"
-          
-          # If pytest failed (exit code 1), set 'tests-failed' label
-          if [ $? -eq 0 ]; then
-            echo "Tests passed, updating label to 'tests-passed'"
-            gh pr edit $PR_NUMBER --add-label tests-passed --remove-label tests-failed
+          if [ ${{ steps.pytest.outcome }} == 'success' ]; then
+            echo "Tests passed, setting 'tests-passed' label."
+            gh pr edit $PR_NUMBER --add-label tests-passed
+            gh pr edit $PR_NUMBER --remove-label tests-failed
           else
-            echo "Tests failed, updating label to 'tests-failed'"
-            gh pr edit $PR_NUMBER --add-label tests-failed --remove-label tests-passed
+            echo "Tests failed, setting 'tests-failed' label."
+            gh pr edit $PR_NUMBER --add-label tests-failed
+            gh pr edit $PR_NUMBER --remove-label tests-passed
           fi
