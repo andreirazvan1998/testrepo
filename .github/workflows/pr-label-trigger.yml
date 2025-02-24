@@ -40,7 +40,7 @@ jobs:
       - name: Trigger Test Workflow if Label is `tests-failed` or PR is Ready for Review
         run: |
           # Trigger on PR moved to "Ready for Review" or if label is "tests-failed"
-          if [[ "$LABELS" == *"tests-failed"* ]] || [[ "${{ github.event.pull_request.state }}" == "open" && "${{ github.event.pull_request.draft }}" == "false" ]]; then
+          if [[ "$LABELS" == *"tests-failed"* ]]; then
             echo "Triggering the test run because the label is 'tests-failed' or PR is Ready for Review"
             gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}
           else
