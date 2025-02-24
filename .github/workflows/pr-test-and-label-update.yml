@@ -1,13 +1,15 @@
+
 name: PR Test and Label Update
 
 on:
+  workflow_dispatch:  # Add this line to allow manual trigger or external trigger via API
   pull_request:
     types:
       - opened
       - synchronize
       - reopened
-      - labeled
-      - unlabeled
+
+# Your jobs and steps here...
 
 jobs:
   check_label:
