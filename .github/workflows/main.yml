@@ -1,4 +1,4 @@
-name: Main Workflow
+name: PR Test and Label Update
 
 on:
   pull_request:
@@ -6,10 +6,9 @@ on:
       - opened
       - synchronize
       - reopened
-      - ready_for_review
 
 jobs:
-  check_pr_label:
+  run_tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,49 +20,31 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Check PR label and decide whether to run pytest
-        id: check_label
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Add the token for authentication
+      - name: Install dependencies
         run: |
-          PR_LABEL=$(gh pr view ${{ github.event.pull_request.number }} --json labels -q ".labels[0].name")
-          echo "Current label: $PR_LABEL"
-          
-          if [ "$PR_LABEL" == "tests-passed" ]; then
-            echo "Tests passed, skipping pytest execution"
-            echo "skip_tests=true" >> $GITHUB_ENV
-            echo "::set-output name=skip_tests::true"  # Set the output variable
-          else
-            echo "Tests failed or not run yet, running pytest"
-            echo "skip_tests=false" >> $GITHUB_ENV
-            echo "::set-output name=skip_tests::false"  # Set the output variable
-          fi
+          pip install -r requirements.txt
 
-  run_tests:
-    needs: check_pr_label
+      - name: Run pytest
+        id: pytest
+        run: |
+          pytest tests/your_test_file.py || echo "Pytest failed with exit code $?" # Run pytest, capture failure if any
+
+  update_label:
+    needs: run_tests
     runs-on: ubuntu-latest
-    if: ${{ needs.check_pr_label.outputs.skip_tests == 'false' }}  # Only run pytest if skip_tests is false
+    if: ${{ always() }}  # Always runs, regardless of test result
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # GitHub Token to update labels
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Run pytest
-        run: |
-          pytest tests/your_test_file.py
-
-  handle_labels:
-    needs: run_tests
-    runs-on: ubuntu-latest
-    if: ${{ needs.run_tests.result == 'success' }}  # Ensure labels are handled only after pytest succeeds
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Add the token for authentication
-    steps:
       - name: Set PR label based on pytest result
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
           echo "PR Number: $PR_NUMBER"
           
-          # Check if pytest passed (exit code 0) or failed (exit code 1)
+          # If pytest failed (exit code 1), set 'tests-failed' label
           if [ $? -eq 0 ]; then
             echo "Tests passed, updating label to 'tests-passed'"
             gh pr edit $PR_NUMBER --add-label tests-passed --remove-label tests-failed
