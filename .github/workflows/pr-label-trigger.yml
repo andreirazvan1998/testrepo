@@ -3,7 +3,7 @@ name: Trigger PR Test on Label Change
 on:
   pull_request:
     types:
-      - opened  # Trigger only when the PR is opened
+      - opened  # Trigger only when PR is opened
 
 jobs:
   trigger_tests:
@@ -12,19 +12,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set GH_TOKEN environment variable
-        run: echo "GH_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
-
-      - name: Get PR Number
-        id: get_pr_info
+      - name: Log PR information
         run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          CURRENT_BRANCH=${{ github.head_ref }}  # Get the current branch of the PR
-          echo "PR Number: $PR_NUMBER"
-          echo "Current Branch: $CURRENT_BRANCH"
-          echo "CURRENT_BRANCH=$CURRENT_BRANCH" >> $GITHUB_ENV
+          echo "PR Title: ${{ github.event.pull_request.title }}"
+          echo "PR Number: ${{ github.event.pull_request.number }}"
 
-      - name: Trigger Test Workflow (Unconditionally)
+      - name: Trigger Test Workflow
         run: |
-          echo "Triggering the test run because the PR is opened"
+          echo "Triggering test workflow because the PR is opened."
           gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}
