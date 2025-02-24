@@ -28,4 +28,9 @@ jobs:
       - name: Trigger Test Workflow
         run: |
           echo "Triggering test workflow because the PR is opened or ready for review."
-          gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}
+          curl -X POST \
+          -H "Accept: application/vnd.github.v3+json" \
+          -H "Authorization: token YOUR_GITHUB_TOKEN" \
+          -d '{"ref": "refs/heads/BRANCH_NAME"}' \
+          https://api.github.com/repos/OWNER/REPO/actions/workflows/pr-test-and-label-update.yml/dispatches
+
