@@ -1,9 +1,6 @@
 name: Trigger PR Test on Label Change
 
 on:
-  push:
-    branches:
-      - main  # Trigger on every push to the main branch (adjust to your branch as needed)
   pull_request:
     types:
       - opened
@@ -11,7 +8,7 @@ on:
       - reopened
       - labeled
       - unlabeled
-      - ready_for_review  # Trigger when PR is moved to 'Ready for Review'
+      - ready_for_review  # Listen for ready_for_review event
 
 jobs:
   trigger_tests:
@@ -23,29 +20,19 @@ jobs:
       - name: Set GH_TOKEN environment variable
         run: echo "GH_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
 
-      - name: Get PR Number and Labels
+      - name: Get PR Number
         id: get_pr_info
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
-          # Explicitly set GH_TOKEN in the environment variable for gh
-          export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
-          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name')
           CURRENT_BRANCH=${{ github.head_ref }}  # Get the current branch of the PR
           echo "PR Number: $PR_NUMBER"
-          echo "Labels: $LABELS"
           echo "Current Branch: $CURRENT_BRANCH"
-          echo "LABELS=$LABELS" >> $GITHUB_ENV
           echo "CURRENT_BRANCH=$CURRENT_BRANCH" >> $GITHUB_ENV
 
-      - name: Debugging Labels
+      - name: Trigger Test Workflow Unconditionally (via curl)
         run: |
-          echo "Current labels: $LABELS"
-          if [[ "$LABELS" == *"tests-failed"* ]]; then
-            echo "The label 'tests-failed' is present!"
-          else
-            echo "The label 'tests-failed' is NOT present."
-          fi
-
-      - name: Trigger Test Workflow if Label is `tests-failed`
-        run: |
-          gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}
+          echo "Triggering the test run unconditionally"
+          curl -X POST -u "token:${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            --data '{"ref":"refs/heads/'"${CURRENT_BRANCH}"'"}' \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/pr-test-and-label-update.yml/dispatches
