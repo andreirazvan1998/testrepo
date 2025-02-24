@@ -53,10 +53,13 @@ jobs:
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
           echo "PR Number: $PR_NUMBER"
-          echo "Pytest outcome: ${{ steps.pytest.outcome }}"
+
+          # Obținem codul de ieșire al pytest
+          TEST_RESULT=$?
+          echo "Pytest exit code: $TEST_RESULT"
 
           # Verifică statusul pytest
-          if [ "${{ steps.pytest.outcome }}" == "success" ]; then
+          if [ $TEST_RESULT -eq 0 ]; then
             echo "Tests passed, setting 'tests-passed' label."
             # Elimină eticheta `tests-failed` dacă există
             if [[ "$LABELS" == *"tests-failed"* ]]; then
