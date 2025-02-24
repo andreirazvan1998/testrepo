@@ -24,7 +24,14 @@ jobs:
       - name: Get PR URL
         id: pr_url
         run: |
+          # Ensure PR URL is correctly fetched
           PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url' || echo "")
+          
+          if [ -z "$PR_URL" ]; then
+            echo "❌ Could not find PR URL. Exiting."
+            exit 1
+          fi
+          
           echo "PR_URL=$PR_URL" >> $GITHUB_ENV
           echo "PR URL: $PR_URL"  # Debugging line
 
@@ -34,12 +41,14 @@ jobs:
           
           if [ "$TEST_RESULT" == "failure" ]; then
             echo "Tests failed. Adding 'tests-failed' label to PR."
-            gh pr edit "$PR_URL" --add-label "tests-failed"
+            # Ensure label is added only if it isn't already added
+            gh pr edit "$PR_URL" --add-label "tests-failed" || echo "Label 'tests-failed' already exists."
             gh pr comment "$PR_URL" --body "❌ Unit tests failed! Please check the test logs."
 
             # Move PR back to draft if tests failed
-            gh pr ready --undo "$PR_URL"
+            gh pr ready --undo "$PR_URL" || echo "Failed to move PR to draft."
           else
             echo "Tests passed. Adding 'tests-passed' label to PR."
-            gh pr edit "$PR_URL" --add-label "tests-passed"
+            # Ensure label is added only if it isn't already added
+            gh pr edit "$PR_URL" --add-label "tests-passed" || echo "Label 'tests-passed' already exists."
             gh pr comment "$PR_URL" --body "✅ Unit tests passed. PR is ready for review."
