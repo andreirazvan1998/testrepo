@@ -38,6 +38,7 @@ jobs:
         run: |
           echo "Running unit tests..."
           pytest test_script.py || echo "Tests failed" > pytest-status.txt
+          cat pytest-status.txt  # Debugging line to show contents of pytest-status.txt
 
       - name: Get PR URL (Only for push events)
         id: pr_url
@@ -57,6 +58,9 @@ jobs:
         run: |
           echo "Checking if tests passed or failed..."
           
+          # Debugging the file contents
+          echo "Contents of pytest-status.txt: $(cat pytest-status.txt)"
+          
           # Check if pytest passed or failed by checking the result file
           if test -f pytest-status.txt && grep -q "Tests failed" pytest-status.txt; then
             echo "❌ Unit tests failed. Moving PR back to draft and adding 'tests-failed' label."
@@ -74,7 +78,6 @@ jobs:
             
             # Add comment indicating success
             gh pr comment "$PR_URL" --body "✅ Unit tests passed. They won't rerun when PR is reopened."
-          fi
 
   e2e_tests:
     needs: unit_tests
@@ -117,4 +120,4 @@ jobs:
           fi
 
       - name: Run E2E Tests
-        run: pytest e2etests.py
+        ru
