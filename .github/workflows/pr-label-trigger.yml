@@ -33,12 +33,13 @@ jobs:
 
       - name: Trigger Test Workflow if Label is `tests-failed`
         run: |
-          if [[ "$LABELS" == *"tests-failed"* ]]; then
-            echo "Triggering the test run because the label is 'tests-failed'"
+          # Retrigger tests only if PR is open and label is `tests-failed`
+          if [[ "$LABELS" == *"tests-failed"* ]] && [[ "${{ github.event.pull_request.state }}" == "open" ]]; then
+            echo "Triggering the test run because the PR is open and the label is 'tests-failed'"
             curl -X POST -u "token:${{ secrets.GITHUB_TOKEN }}" \
               -H "Accept: application/vnd.github.v3+json" \
               --data '{"ref":"refs/heads/'"${CURRENT_BRANCH}"'"}' \
               https://api.github.com/repos/${{ github.repository }}/actions/workflows/pr-test-and-label-update.yml/dispatches
           else
-            echo "No need to trigger tests as the label is not 'tests-failed'"
+            echo "No need to trigger tests as the PR is not open or label is not 'tests-failed'"
           fi
