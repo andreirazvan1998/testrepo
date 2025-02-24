@@ -56,14 +56,18 @@ jobs:
           echo "❌ Unit tests failed, moving PR back to draft."
           gh pr ready --undo "$PR_URL"
           gh pr comment "$PR_URL" --body "🚨 Unit tests failed in Draft. They will rerun when PR is reopened."
-          # Debugging: Check the existing labels
-          echo "Checking existing labels on PR..."
-          gh pr view "$PR_URL" --json labels -q '.labels[].name'
-          # Remove the "tests-passed" label if exists
+          
+          # Debugging: Check current labels
+          echo "Checking current labels on PR..."
+          gh pr view "$PR_URL" --json labels -q '.labels[].name' || echo "Failed to fetch labels"
+          
+          # Remove the "tests-passed" label if it exists
+          echo "Removing 'tests-passed' label if present..."
           gh pr edit "$PR_URL" --remove-label "tests-passed" || echo "tests-passed label not found"
-          # Add "tests-failed" label
-          gh pr edit "$PR_URL" --add-label "tests-failed"
-          echo "Added 'tests-failed' label."
+          
+          # Add the "tests-failed" label
+          echo "Adding 'tests-failed' label..."
+          gh pr edit "$PR_URL" --add-label "tests-failed" || echo "Failed to add 'tests-failed' label"
 
       - name: Mark PR as Passed if Tests Succeed
         if: success() && github.event_name == 'push' && env.PR_URL != ''
@@ -71,13 +75,22 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh auth setup-git
-          # Ensure the 'tests-passed' label exists before adding it
-          echo "Checking for existing 'tests-passed' label..."
-          gh api repos/${{ github.repository }}/labels --jq '.[].name' | grep -qx "tests-passed" || \
-          gh api repos/${{ github.repository }}/labels -X POST -f name="tests-passed" -f color="0e8a16"
-          # Add the "tests-passed" label and remove "tests-failed"
-          gh pr edit "$PR_URL" --add-label "tests-passed"
-          gh pr edit "$PR_URL" --remove-label "tests-failed" || echo "tests-failed label not found"
+          
+          # Check if 'tests-passed' label exists before adding it
+          echo "Checking for 'tests-passed' label..."
+          EXISTING_LABELS=$(gh pr view "$PR_URL" --json labels -q '.labels[].name')
+          if [[ "$EXISTING_LABELS" != *"tests-passed"* ]]; then
+            echo "Adding 'tests-passed' label..."
+            gh pr edit "$PR_URL" --add-label "tests-passed" || echo "Failed to add 'tests-passed' label"
+          else
+            echo "'tests-passed' label already exists."
+          fi
+          
+          # Remove 'tests-failed' label if present
+          echo "Removing 'tests-failed' label..."
+          gh pr edit "$PR_URL" --remove-label "tests-failed" || echo "'tests-failed' label not found"
+
+          # Commenting on PR to confirm success
           gh pr comment "$PR_URL" --body "✅ Unit tests passed. They won't rerun when PR is reopened."
 
   e2e_tests:
