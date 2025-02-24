@@ -1,17 +1,54 @@
+
 name: PR Test and Label Update
 
 on:
   workflow_dispatch:  # Add this line to allow manual trigger or external trigger via API
-  workflow_run:
-    workflows: ["Trigger PR Test on Label Change"]
+  pull_request:
     types:
-      - completed
-      
+      - opened
+      - synchronize
+      - reopened
+
+# Your jobs and steps here...
+
 jobs:
-  run_pytest:
+  check_label:
     runs-on: ubuntu-latest
     outputs:
-      result: ${{ steps.pytest.outcome }}  # Saving test result for the label update
+      run_tests: ${{ steps.check_label.outputs.run_tests }}  # Output to determine if pytest should run
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Get PR Number
+        id: get_pr
+        run: echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+
+      - name: Get current labels
+        id: get_labels
+        run: |
+          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name')
+          echo "Current labels: $LABELS"
+          echo "LABELS=$LABELS" >> $GITHUB_ENV
+
+      - name: Check if tests should run
+        id: check_label
+        run: |
+          if [[ "${{ github.event.pull_request.state }}" == "open" ]] && [[ "$LABELS" == *"tests-failed"* ]]; then
+            echo "Tests should run (PR is open and label is tests-failed)"
+            echo "run_tests=true" >> $GITHUB_ENV
+          else
+            echo "Tests should NOT run (PR is not open or label is not tests-failed)"
+            echo "run_tests=false" >> $GITHUB_ENV
+          fi
+          
+  run_pytest:
+    needs: check_label
+    runs-on: ubuntu-latest
+    if: ${{ needs.check_label.outputs.run_tests == 'true' }}  # Run only if check_label says so
+    outputs:
+      result: ${{ steps.pytest.outcome }}
 
     steps:
       - name: Checkout repository
@@ -37,7 +74,7 @@ jobs:
   update_label:
     needs: run_pytest
     runs-on: ubuntu-latest
-    if: always()  # Run regardless of pytest result
+    if: always()  # This will run no matter the outcome of pytest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -59,11 +96,11 @@ jobs:
       - name: Update PR Label
         run: |
           if [ "${{ needs.run_pytest.outputs.result }}" == "success" ]; then
-            echo "✅ Tests passed! Setting label to 'tests-passed'"
+            echo "✅ Testele au trecut! Setăm eticheta 'tests-passed'"
             gh pr edit $PR_NUMBER --remove-label tests-failed || true
             gh pr edit $PR_NUMBER --add-label tests-passed
           else
-            echo "❌ Tests failed! Setting label to 'tests-failed'"
+            echo "❌ Testele au picat! Setăm eticheta 'tests-failed'"
             gh pr edit $PR_NUMBER --remove-label tests-passed || true
             gh pr edit $PR_NUMBER --add-label tests-failed
           fi
