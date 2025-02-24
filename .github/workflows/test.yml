@@ -3,11 +3,11 @@ name: Run Pytest on PR
 on:
   push:
     branches:
-      - '**'  # Runs on all branches
+      - '**'  # Runs on every push
   pull_request:
     types:
-      - ready_for_review  # Trigger when PR is moved from draft to open
-  workflow_dispatch:  # Allows manual execution of E2E tests
+      - ready_for_review  # Trigger when PR moves from draft to open
+  workflow_dispatch:  # Allows manual execution
 
 permissions:
   pull-requests: write
@@ -15,6 +15,7 @@ permissions:
 jobs:
 
   unit_tests:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
 
     steps:
@@ -36,17 +37,28 @@ jobs:
         run: pytest test_script.py
 
       - name: Move PR to Draft if Tests Fail
-        if: failure()
+        if: failure() && github.event_name == 'push'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "❌ Unit tests failed, moving PR back to draft."
           gh auth setup-git
-          gh pr ready --undo "${{ github.event.pull_request.html_url }}"
-          gh pr comment "${{ github.event.pull_request.html_url }}" --body "❌ Unit tests failed! PR moved back to Draft."
+          PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url')
+          if [ -n "$PR_URL" ]; then
+            gh pr ready --undo "$PR_URL"
+            gh pr comment "$PR_URL" --body "❌ Unit tests failed! PR moved back to Draft."
+          fi
+
+      - name: Mark Failure in PR
+        if: failure() && github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "unit-tests-failed" > unit_test_status.txt
+          gh pr comment "${{ github.event.pull_request.html_url }}" --body "🚨 Unit tests failed in Draft. They will rerun when PR is reopened."
 
   e2e_tests:
-    needs: unit_tests  # Only run if unit tests pass
+    needs: unit_tests
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
@@ -69,7 +81,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh auth setup-git
-          # Fetch PR data using the correct command
           PR_STATE=$(gh pr view "${{ github.event.pull_request.number }}" --json state -q ".state")
           if [ "$PR_STATE" != "OPEN" ]; then
             echo "❌ PR is not open. Cancelling E2E tests."
