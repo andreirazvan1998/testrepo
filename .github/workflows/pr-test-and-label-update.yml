@@ -40,7 +40,8 @@ jobs:
           else
             echo "Tests should NOT run (PR is not open or label is not tests-failed)"
             echo "run_tests=false" >> $GITHUB_ENV
-
+          fi
+          
   run_pytest:
     needs: check_label
     runs-on: ubuntu-latest
