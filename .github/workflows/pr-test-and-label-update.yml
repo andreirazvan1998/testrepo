@@ -2,10 +2,11 @@ name: PR Test and Label Update
 
 on:
   workflow_dispatch:  # Allow manual trigger or external trigger via API
-  workflow_run:
-    workflows: ["Trigger PR Test on Label Change"]
+  pull_request:
     types:
-      - completed
+      - opened
+      - synchronize
+      - reopened
 
 jobs:
   run_pytest:
