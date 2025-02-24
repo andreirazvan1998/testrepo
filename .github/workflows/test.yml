@@ -37,7 +37,7 @@ jobs:
         id: pytest
         run: |
           echo "Running unit tests..."
-          pytest test_script.py || echo "Tests failed" > pytest-status.txt
+          pytest test_script.py --maxfail=1 --disable-warnings --tb=short || echo "Tests failed" > pytest-status.txt
 
       - name: Get PR URL (Only for push events)
         id: pr_url
