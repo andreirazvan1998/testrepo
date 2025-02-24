@@ -26,7 +26,7 @@ jobs:
 
       - name: Run pytest
         id: pytest
-        continue-on-error: true  # Aceasta permite ca workflow-ul să nu se oprească chiar dacă testele pică
+        continue-on-error: true  # Permite continuarea job-ului chiar dacă testele pică
         run: |
           pytest test_script.py
           echo "Test status: $?"  # Afișează statusul testului
@@ -34,7 +34,7 @@ jobs:
   update_label:
     needs: run_pytest
     runs-on: ubuntu-latest
-    if: ${{ always() }}  # Aceasta se asigură că job-ul de actualizare a etichetei se va rula întotdeauna
+    if: ${{ always() }}  # Se asigură că job-ul de actualizare a etichetei se va rula întotdeauna
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Token-ul GitHub pentru modificarea etichetelor
     steps:
@@ -54,13 +54,13 @@ jobs:
           PR_NUMBER=${{ github.event.pull_request.number }}
           echo "PR Number: $PR_NUMBER"
           
-          # Verifică dacă eticheta "tests-passed" există deja
+          # Verifică dacă există eticheta 'tests-passed' sau 'tests-failed'
           if [[ "$LABELS" == *"tests-passed"* ]]; then
-            echo "tests-passed already exists, skipping add."
-            gh pr edit $PR_NUMBER --remove-label tests-failed  # Șterge eticheta de failure, dacă există
+            echo "tests-passed label found. Removing and updating."
+            gh pr edit $PR_NUMBER --remove-label tests-passed
           elif [[ "$LABELS" == *"tests-failed"* ]]; then
-            echo "tests-failed already exists, skipping add."
-            gh pr edit $PR_NUMBER --remove-label tests-passed  # Șterge eticheta de success, dacă există
+            echo "tests-failed label found. Removing and updating."
+            gh pr edit $PR_NUMBER --remove-label tests-failed
           fi
           
           # Dacă testele au trecut
