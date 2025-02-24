@@ -1,11 +1,15 @@
 name: Run Pytest
 
 on:
-  workflow_dispatch:  # This allows the pytest workflow to be triggered manually
+  workflow_run:
+    workflows: ["Main Workflow"]
+    types:
+      - completed
 
 jobs:
-  pytest:
+  pytest_execution:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -20,18 +24,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest
 
-      - name: Run Unit Tests
+      - name: Run pytest
         id: pytest
-        run: pytest test_script.py
-
-      - name: Label PR as 'tests-passed' if tests pass
-        if: success()
         run: |
-          gh pr edit "${{ github.event.pull_request.number }}" --add-label "tests-passed"
-          gh pr edit "${{ github.event.pull_request.number }}" --remove-label "tests-failed"
-
-      - name: Label PR as 'tests-failed' if tests fail
-        if: failure()
+          pytest test_script.py
+          echo "Test status: $?"
+        
+      - name: Set PR label based on pytest result
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh pr edit "${{ github.event.pull_request.number }}" --add-label "tests-failed"
-          gh pr edit "${{ github.event.pull_request.number }}" --remove-label "tests-passed"
+          echo "Checking pytest result..."
+          if [ ${{ steps.pytest.outcome }} == 'success' ]; then
+            echo "Tests passed, setting 'tests-passed' label."
+            gh label add tests-passed ${{ github.event.pull_request.url }}
+            gh label remove tests-failed ${{ github.event.pull_request.url }}
+          else
+            echo "Tests failed, setting 'tests-failed' label."
+            gh label add tests-failed ${{ github.event.pull_request.url }}
+            gh label remove tests-passed ${{ github.event.pull_request.url }}
+          fi

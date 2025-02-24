@@ -1,52 +1,63 @@
-name: Run Pytest on PR
+name: Main Workflow
 
 on:
-  push:
-    branches:
-      - '**'  # Runs on all branches
   pull_request:
     types:
-      - ready_for_review  # Trigger when PR is moved from draft to open
-  workflow_dispatch:  # Allows manual execution of E2E tests
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
 
-permissions:
-  pull-requests: write
+  workflow_dispatch:  # Allow manual execution for testing
 
 jobs:
-  check_label_and_run_tests:
+  handle_pr:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up GitHub CLI
-        run: |
-          gh auth setup-git
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
 
-      - name: Check PR label before running tests
+      - name: Check PR label and decide whether to run pytest
         id: check_label
         run: |
-          PR_STATE=$(gh pr view "${{ github.event.pull_request.number }}" --json state -q ".state")
-          LABELS=$(gh pr view "${{ github.event.pull_request.number }}" --json labels -q ".labels[].name")
-          echo "PR_STATE=$PR_STATE"
-          echo "LABELS=$LABELS"
-
-          # If PR is open and 'tests-passed' label exists, skip the test execution
-          if [[ "$PR_STATE" == "OPEN" && "$LABELS" == *"tests-passed"* ]]; then
-            echo "Tests have passed previously. Skipping pytest execution."
-            echo "::set-output name=skip_tests::true"
+          PR_LABEL=$(gh pr view ${{ github.event.pull_request.number }} --json labels -q ".labels[0].name")
+          echo "Current label: $PR_LABEL"
+          if [ "$PR_LABEL" == "tests-passed" ]; then
+            echo "Tests passed, skipping pytest execution"
+            echo "skip_tests=true" >> $GITHUB_ENV
           else
-            echo "::set-output name=skip_tests::false"
+            echo "Tests failed or not run yet, running pytest"
+            echo "skip_tests=false" >> $GITHUB_ENV
           fi
 
-  trigger_pytest:
-    needs: check_label_and_run_tests
+  run_tests:
+    needs: handle_pr
     runs-on: ubuntu-latest
-    if: steps.check_label.outputs.skip_tests != 'true'  # Trigger pytest only if tests need to be run
+    if: needs.handle_pr.outputs.skip_tests == 'false'  # Only run pytest if it's not skipped
     steps:
-      - name: Trigger Pytest Workflow
+      - name: Trigger pytest workflow
         uses: peter-evans/workflow-dispatch@v1
         with:
-          repository: ${{ github.repository }}
-          workflow: run-pytest.yml  # Path to your pytest workflow file
-          ref: ${{ github.sha }}
+          workflow: run-pytest.yml
+          ref: main
+          inputs:
+            run_pytest: true
+
+  e2e_tests:
+    needs: run_tests
+    runs-on: ubuntu-latest
+    if: needs.handle_pr.outputs.skip_tests == 'true'  # Run e2e tests only if pytest was skipped
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Run E2E tests
+        run: |
+          # Add your E2E tests commands here
+          echo "Running E2E tests..."
