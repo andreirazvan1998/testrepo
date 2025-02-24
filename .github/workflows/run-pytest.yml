@@ -36,12 +36,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
           if [ ${{ steps.pytest.outcome }} == 'success' ]; then
             echo "Tests passed, setting 'tests-passed' label."
-            gh pr edit ${{ github.event.pull_request.number }} --add-label tests-passed
-            gh pr edit ${{ github.event.pull_request.number }} --remove-label tests-failed
+            gh pr edit $PR_NUMBER --add-label tests-passed
+            gh pr edit $PR_NUMBER --remove-label tests-failed
           else
             echo "Tests failed, setting 'tests-failed' label."
-            gh pr edit ${{ github.event.pull_request.number }} --add-label tests-failed
-            gh pr edit ${{ github.event.pull_request.number }} --remove-label tests-passed
+            gh pr edit $PR_NUMBER --add-label tests-failed
+            gh pr edit $PR_NUMBER --remove-label tests-passed
           fi
