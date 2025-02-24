@@ -6,6 +6,8 @@ on:
       - opened
       - synchronize
       - reopened
+      - labeled
+      - unlabeled
 
 jobs:
   check_label:
@@ -19,26 +21,24 @@ jobs:
       - name: Authenticate with GitHub CLI
         run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
-      - name: Get current PR label
+      - name: Get PR Status and Labels
         id: check
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
+          PR_STATE=$(gh pr view $PR_NUMBER --json state -q '.state')
           LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels | map(.name) | join(" ")')
+
+          echo "PR State: $PR_STATE"
           echo "Current labels: $LABELS"
 
-          if [[ "${{ github.event.action }}" == "synchronize" ]]; then
+          if [[ "$PR_STATE" == "OPEN" && "$LABELS" == *"tests-failed"* ]]; then
+            echo "PR is OPEN and has 'tests-failed'. Running tests."
+            echo "run_tests=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event.action }}" == "synchronize" ]]; then
             echo "Code updated, running tests."
             echo "run_tests=true" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event.action }}" == "opened" || "${{ github.event.action }}" == "reopened" ]]; then
-            if [[ "$LABELS" == *"tests-failed"* ]]; then
-              echo "PR reopened and has 'tests-failed'. Running tests."
-              echo "run_tests=true" >> $GITHUB_OUTPUT
-            else
-              echo "PR reopened but tests previously passed. Skipping tests."
-              echo "run_tests=false" >> $GITHUB_OUTPUT
-            fi
           else
-            echo "No conditions met for running tests."
+            echo "No need to run tests."
             echo "run_tests=false" >> $GITHUB_OUTPUT
 
   run_pytest:
