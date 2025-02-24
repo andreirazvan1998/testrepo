@@ -11,7 +11,7 @@ on:
       - ready_for_review  # Listen for ready_for_review event
 
 jobs:
-  check_label:
+  trigger_tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -28,33 +28,17 @@ jobs:
           export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
           LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name')
           CURRENT_BRANCH=${{ github.head_ref }}  # Get the current branch of the PR
-          PR_STATE=${{ github.event.pull_request.state }}  # Get the PR state (open, closed, etc.)
           echo "PR Number: $PR_NUMBER"
           echo "Labels: $LABELS"
           echo "Current Branch: $CURRENT_BRANCH"
-          echo "PR State: $PR_STATE"
           echo "LABELS=$LABELS" >> $GITHUB_ENV
           echo "CURRENT_BRANCH=$CURRENT_BRANCH" >> $GITHUB_ENV
-          echo "PR_STATE=$PR_STATE" >> $GITHUB_ENV
 
-      - name: Check if Tests Should Run
-        id: check_tests
+      - name: Trigger Test Workflow if Label is `tests-failed`
         run: |
-          echo "Evaluating PR state and labels..."
-          echo "PR State: $PR_STATE"
-          echo "Labels: $LABELS"
-          
-          # Check if the PR is open and the label contains 'tests-failed'
-          if [[ "$PR_STATE" == "open" ]] && [[ "$LABELS" == *"tests-failed"* ]]; then
-            echo "Tests should run (PR is open and label is 'tests-failed')"
-            echo "run_tests=true" >> $GITHUB_ENV
+          if [[ "$LABELS" == *"tests-failed"* ]] && [[ "${{ github.event.pull_request.state }}" == "open" ]]; then
+            echo "Triggering the test run because the label is 'tests-failed' and PR is open"
+            gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}
           else
-            echo "Tests should NOT run (PR is not open or label is not 'tests-failed')"
-            echo "run_tests=false" >> $GITHUB_ENV
+            echo "No need to trigger tests as the label is not 'tests-failed' or PR is not open"
           fi
-
-      - name: Trigger next workflow if needed
-        if: ${{ env.run_tests == 'true' }}
-        run: |
-          echo "Triggering 'pr-test-and-label-update' workflow because the label is 'tests-failed' and PR is open."
-          gh workflow run pr-test-and-label-update.yml --ref ${{ github.ref }}
