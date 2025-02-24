@@ -16,6 +16,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Set GH_TOKEN environment variable
+        run: echo "GH_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+
       - name: Get PR Number and Labels
         id: get_pr_info
         run: |
@@ -26,8 +29,6 @@ jobs:
           echo "LABELS=$LABELS" >> $GITHUB_ENV
 
       - name: Trigger Test Workflow if Label is `tests-failed`
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Add the GitHub token here
         run: |
           if [[ "$LABELS" == *"tests-failed"* ]]; then
             echo "Triggering the test run because the label is 'tests-failed'"
