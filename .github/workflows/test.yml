@@ -35,6 +35,7 @@ jobs:
 
       - name: Run Unit Tests
         id: pytest
+        continue-on-error: true  # This allows the following steps to run even if the tests fail
         run: pytest test_script.py
 
       - name: Get PR URL (Only for push events)
