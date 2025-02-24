@@ -4,7 +4,7 @@ on:
   pull_request:
     types:
       - opened  # Trigger only when PR is opened
-      - ready_for_review
+      - ready_for_review  # Trigger when PR is ready for review
 
 jobs:
   trigger_tests:
@@ -15,13 +15,17 @@ jobs:
 
       - name: Set GH_TOKEN environment variable
         run: echo "GH_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
-        
+
+      - name: Authenticate GitHub CLI
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
       - name: Log PR information
         run: |
           echo "PR Title: ${{ github.event.pull_request.title }}"
           echo "PR Number: ${{ github.event.pull_request.number }}"
+          echo "Ref for PR: ${{ github.head_ref }}"
 
       - name: Trigger Test Workflow
         run: |
-          echo "Triggering test workflow because the PR is opened."
+          echo "Triggering test workflow because the PR is opened or ready for review."
           gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}
