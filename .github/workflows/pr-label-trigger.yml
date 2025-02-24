@@ -3,12 +3,7 @@ name: Trigger PR Test on Label Change
 on:
   pull_request:
     types:
-      - opened
-      - synchronize
-      - reopened
-      - labeled
-      - unlabeled
-      - ready_for_review  # Listen for ready_for_review event
+      - opened  # Only trigger when the PR is moved to 'open'
 
 jobs:
   trigger_tests:
@@ -31,7 +26,12 @@ jobs:
           echo "Current Branch: $CURRENT_BRANCH"
           echo "CURRENT_BRANCH=$CURRENT_BRANCH" >> $GITHUB_ENV
 
-      - name: Trigger Test Workflow Unconditionally
+      - name: Trigger Test Workflow if PR is Open
         run: |
-          echo "Triggering the test run unconditionally"
-          gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}
+          # Only trigger if PR is in 'open' state
+          if [[ "${{ github.event.pull_request.state }}" == "open" ]]; then
+            echo "Triggering the test run because the PR is open"
+            gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}
+          else
+            echo "PR is not open. Skipping test trigger."
+          fi
