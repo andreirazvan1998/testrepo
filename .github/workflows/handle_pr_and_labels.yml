@@ -1,4 +1,4 @@
-name: Handle PR Labels Based on Test Result
+name: Run Pytest on PR
 
 on:
   push:
@@ -7,15 +7,42 @@ on:
   pull_request:
     types:
       - ready_for_review  # Trigger when PR is moved from draft to open
-  workflow_dispatch:  # Allows manual execution
+  workflow_dispatch:  # Allows manual execution of E2E tests
 
 permissions:
   pull-requests: write
 
 jobs:
-  pytest_and_labels:
+  check_label_and_run_tests:
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
+      - name: Set up GitHub CLI
+        run: |
+          gh auth setup-git
+
+      - name: Check PR label before running tests
+        id: check_label
+        run: |
+          PR_STATE=$(gh pr view "${{ github.event.pull_request.number }}" --json state -q ".state")
+          LABELS=$(gh pr view "${{ github.event.pull_request.number }}" --json labels -q ".labels[].name")
+          echo "PR_STATE=$PR_STATE"
+          echo "LABELS=$LABELS"
+
+          # If PR is open and 'tests-passed' label exists, skip the test execution
+          if [[ "$PR_STATE" == "OPEN" && "$LABELS" == *"tests-passed"* ]]; then
+            echo "Tests have passed previously. Skipping pytest execution."
+            echo "::set-output name=skip_tests::true"
+          else
+            echo "::set-output name=skip_tests::false"
+          fi
+
+  unit_tests:
+    needs: check_label_and_run_tests
+    runs-on: ubuntu-latest
+    if: steps.check_label.outputs.skip_tests != 'true'  # Skip if tests were previously passed
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -32,44 +59,16 @@ jobs:
 
       - name: Run Unit Tests
         id: pytest
-        continue-on-error: true  # Allow workflow to continue even if pytest fails
-        run: |
-          pytest test_script.py  # Run pytest and capture the result
+        run: pytest test_script.py
 
-      - name: Set GitHub CLI authentication
+      - name: Label PR as 'tests-passed' if tests pass
+        if: success()
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          gh pr edit "${{ github.event.pull_request.number }}" --add-label "tests-passed"
+          gh pr edit "${{ github.event.pull_request.number }}" --remove-label "tests-failed"
 
-      - name: Get PR URL
-        id: pr_url
+      - name: Label PR as 'tests-failed' if tests fail
+        if: failure()
         run: |
-          PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url')
-          if [ -z "$PR_URL" ]; then
-            echo "❌ Could not find PR URL. Exiting."
-            exit 1
-          fi
-          echo "PR_URL=$PR_URL" >> $GITHUB_ENV
-
-      - name: Check for existing labels and replace them
-        run: |
-          # Check if 'tests-passed' label exists
-          existing_labels=$(gh pr view "$PR_URL" --json labels -q '.labels[].name')
-          if echo "$existing_labels" | grep -q "tests-passed"; then
-            if [ "${{ steps.pytest.outcome }}" != "success" ]; then
-              echo "Tests failed. Replacing 'tests-passed' with 'tests-failed' label."
-              gh pr edit "$PR_URL" --remove-label "tests-passed" --add-label "tests-failed"
-            fi
-          elif echo "$existing_labels" | grep -q "tests-failed"; then
-            if [ "${{ steps.pytest.outcome }}" == "success" ]; then
-              echo "Tests passed. Replacing 'tests-failed' with 'tests-passed' label."
-              gh pr edit "$PR_URL" --remove-label "tests-failed" --add-label "tests-passed"
-            fi
-          else
-            if [ "${{ steps.pytest.outcome }}" == "success" ]; then
-              echo "Tests passed. Adding 'tests-passed' label."
-              gh pr edit "$PR_URL" --add-label "tests-passed"
-            else
-              echo "Tests failed. Adding 'tests-failed' label."
-              gh pr edit "$PR_URL" --add-label "tests-failed"
-            fi
-          fi
+          gh pr edit "${{ github.event.pull_request.number }}" --add-label "tests-failed"
+          gh pr edit "${{ github.event.pull_request.number }}" --remove-label "tests-passed"
