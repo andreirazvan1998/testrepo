@@ -1,4 +1,4 @@
-name: Handle PR and Labels
+name: Handle PR Labels Based on Test Result
 
 on:
   push:
@@ -13,11 +13,9 @@ permissions:
   pull-requests: write
 
 jobs:
-  # Job to run pytest tests
-  unit_tests:
+  # Job to run pytest tests and handle labels
+  pytest_and_labels:
     runs-on: ubuntu-latest
-    outputs:
-      test-result: ${{ steps.pytest.outcome }}  # Capture the outcome of the pytest step
 
     steps:
       - name: Checkout repository
@@ -36,20 +34,9 @@ jobs:
       - name: Run Unit Tests
         id: pytest
         run: |
-          pytest test_script.py
-          echo "Test result: $?"
+          pytest test_script.py  # Run pytest and capture the result
 
-  # Job to handle the labels based on the pytest result
-  handle_labels:
-    runs-on: ubuntu-latest
-    needs: unit_tests  # Ensure this job runs after unit_tests
-    if: always()  # Ensure this job runs regardless of the result of the unit_tests job
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Set up GitHub CLI authentication
+      - name: Set GitHub CLI authentication
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
@@ -65,17 +52,11 @@ jobs:
 
       - name: Add 'tests-passed' or 'tests-failed' Label Based on Test Result
         run: |
-          # Get the exit code of pytest
-          TEST_RESULT="${{ needs.unit_tests.outputs.test-result }}"
-
-          echo "Checking test result..."
-          if [[ "$TEST_RESULT" == "success" ]]; then
+          # Check the pytest exit code
+          if [ $? -eq 0 ]; then
             echo "Tests passed. Adding 'tests-passed' label."
             gh pr edit "$PR_URL" --add-label "tests-passed" || echo "Label 'tests-passed' already exists."
-            gh pr comment "$PR_URL" --body "✅ Unit tests passed. PR is ready for review."
           else
             echo "Tests failed. Adding 'tests-failed' label."
             gh pr edit "$PR_URL" --add-label "tests-failed" || echo "Label 'tests-failed' already exists."
-            gh pr comment "$PR_URL" --body "❌ Unit tests failed! Please check the test logs."
-            # Optionally move PR to draft if tests failed
-            gh pr ready --undo "$PR_URL" || echo "Failed to move PR to draft."
+          fi
