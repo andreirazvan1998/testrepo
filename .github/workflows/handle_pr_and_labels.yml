@@ -48,6 +48,9 @@ jobs:
       - name: Get PR URL
         id: pr_url
         run: |
+          # Set the GH_TOKEN environment variable for authentication
+          echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+          
           PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url' || echo "")
           
           if [ -z "$PR_URL" ]; then
@@ -59,8 +62,8 @@ jobs:
 
       - name: Add 'tests-passed' or 'tests-failed' Label Based on Test Result
         run: |
-          # Use GITHUB_TOKEN for authentication
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          # Authenticate with GitHub CLI using GITHUB_TOKEN
+          gh auth login --with-token < $GITHUB_TOKEN
 
           # Check if pytest passed or failed in the previous job
           TEST_RESULT=${{ needs.unit_tests.outputs.test-result }}
