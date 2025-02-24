@@ -23,17 +23,22 @@ jobs:
         id: check
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
-          LABEL=$(gh pr view $PR_NUMBER --json labels -q ".labels[0].name")
-          echo "Current label: $LABEL"
+          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels | map(.name) | join(" ")')
+          echo "Current labels: $LABELS"
 
           if [[ "${{ github.event.action }}" == "synchronize" ]]; then
             echo "Code updated, running tests."
             echo "run_tests=true" >> $GITHUB_OUTPUT
-          elif [[ "$LABEL" == "tests-failed" ]]; then
-            echo "PR is open and tests previously failed. Running tests."
-            echo "run_tests=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event.action }}" == "opened" || "${{ github.event.action }}" == "reopened" ]]; then
+            if [[ "$LABELS" == *"tests-failed"* ]]; then
+              echo "PR reopened and has 'tests-failed'. Running tests."
+              echo "run_tests=true" >> $GITHUB_OUTPUT
+            else
+              echo "PR reopened but tests previously passed. Skipping tests."
+              echo "run_tests=false" >> $GITHUB_OUTPUT
+            fi
           else
-            echo "Skipping tests as PR is open and tests already passed."
+            echo "No conditions met for running tests."
             echo "run_tests=false" >> $GITHUB_OUTPUT
 
   run_pytest:
@@ -82,7 +87,7 @@ jobs:
       - name: Get current labels
         id: get_labels
         run: |
-          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name')
+          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels | map(.name) | join(" ")')
           echo "Current labels: $LABELS"
           echo "LABELS=$LABELS" >> $GITHUB_ENV
 
