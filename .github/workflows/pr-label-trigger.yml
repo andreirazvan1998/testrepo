@@ -24,8 +24,9 @@ jobs:
         id: get_pr_info
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
-          # Explicitly pass GH_TOKEN to gh command
-          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name' -H "Authorization: Bearer $GH_TOKEN")
+          # Explicitly set GH_TOKEN in the environment variable for gh
+          export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name')
           CURRENT_BRANCH=${{ github.head_ref }}  # Get the current branch of the PR
           echo "PR Number: $PR_NUMBER"
           echo "Labels: $LABELS"
