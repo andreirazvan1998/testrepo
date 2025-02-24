@@ -8,11 +8,35 @@ on:
       - reopened
 
 jobs:
-  run_pytest:
+  check_label:
     runs-on: ubuntu-latest
     outputs:
-      result: ${{ steps.pytest.outcome }}  # Salvăm rezultatul testelor pentru următorul job
+      should_run_tests: ${{ steps.check.outputs.run_tests }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
+      - name: Get current PR label
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          LABEL=$(gh pr view $PR_NUMBER --json labels -q ".labels[0].name")
+          echo "Current label: $LABEL"
+          
+          if [[ "$LABEL" == "tests-passed" ]]; then
+            echo "Tests already passed, skipping pytest."
+            echo "run_tests=false" >> $GITHUB_OUTPUT
+          else
+            echo "Tests need to run."
+            echo "run_tests=true" >> $GITHUB_OUTPUT
+          fi
+
+  run_pytest:
+    needs: check_label
+    if: needs.check_label.outputs.should_run_tests == 'true'
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -29,41 +53,48 @@ jobs:
 
       - name: Run pytest
         id: pytest
-        continue-on-error: true  # Asigură că job-ul continuă chiar dacă testele pică
+        continue-on-error: true
         run: |
           pytest test_script.py
-        shell: bash
-
+          echo "Test status: $?"
+      
   update_label:
     needs: run_pytest
     runs-on: ubuntu-latest
-    if: always()  # Asigură că job-ul rulează indiferent de rezultatul testelor
+    if: always()
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Authenticate with GitHub CLI
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-
-      - name: Get PR Number
-        id: get_pr
-        run: echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
-
       - name: Get current labels
         id: get_labels
         run: |
-          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name')
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels | map(.name) | join(",")')
           echo "Current labels: $LABELS"
           echo "LABELS=$LABELS" >> $GITHUB_ENV
 
-      - name: Update PR Label
+      - name: Set PR label based on pytest result
         run: |
-          if [ "${{ needs.run_pytest.outputs.result }}" == "success" ]; then
-            echo "✅ Testele au trecut! Setăm eticheta 'tests-passed'"
-            gh pr edit $PR_NUMBER --remove-label tests-failed || true
-            gh pr edit $PR_NUMBER --add-label tests-passed
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          echo "PR Number: $PR_NUMBER"
+
+          if [ ${{ steps.pytest.outcome }} == 'success' ]; then
+            echo "Tests passed, updating label to 'tests-passed'."
+            if [[ "$LABELS" == *"tests-failed"* ]]; then
+              gh pr edit $PR_NUMBER --remove-label tests-failed
+            fi
+            if [[ "$LABELS" != *"tests-passed"* ]]; then
+              gh pr edit $PR_NUMBER --add-label tests-passed
+            fi
           else
-            echo "❌ Testele au picat! Setăm eticheta 'tests-failed'"
-            gh pr edit $PR_NUMBER --remove-label tests-passed || true
-            gh pr edit $PR_NUMBER --add-label tests-failed
+            echo "Tests failed, updating label to 'tests-failed'."
+            if [[ "$LABELS" == *"tests-passed"* ]]; then
+              gh pr edit $PR_NUMBER --remove-label tests-passed
+            fi
+            if [[ "$LABELS" != *"tests-failed"* ]]; then
+              gh pr edit $PR_NUMBER --add-label tests-failed
+            fi
           fi
