@@ -45,10 +45,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up GitHub CLI
-        run: |
-          gh auth setup-git
-
       - name: Get PR URL
         id: pr_url
         run: |
@@ -63,6 +59,9 @@ jobs:
 
       - name: Add 'tests-passed' or 'tests-failed' Label Based on Test Result
         run: |
+          # Use GITHUB_TOKEN for authentication
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
           # Check if pytest passed or failed in the previous job
           TEST_RESULT=${{ needs.unit_tests.outputs.test-result }}
           
