@@ -28,4 +28,4 @@ jobs:
       - name: Trigger Test Workflow
         run: |
           echo "Triggering test workflow because the PR is opened or ready for review."
-          gh workflow run "PR Test and Label Update" --ref test2
+          gh workflow run pr-test-and-label-update.yml --ref test2
