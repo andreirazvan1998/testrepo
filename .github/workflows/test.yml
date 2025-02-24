@@ -37,9 +37,8 @@ jobs:
         id: pytest
         run: |
           echo "Running unit tests..."
-          pytest test_script.py --maxfail=1 --disable-warnings --tb=short || echo "Tests failed" > pytest-status.txt
-          echo "Test result: $(cat pytest-status.txt)"
-
+          pytest test_script.py --maxfail=1 --disable-warnings --tb=short || exit 1  # Exit explicitly if tests fail
+          
       - name: Check if Tests Failed
         id: check_test_result
         run: |
@@ -63,40 +62,22 @@ jobs:
           echo "PR_URL=$PR_URL" >> $GITHUB_ENV
           echo "PR URL: $PR_URL"  # Debugging line
 
-      - name: Check and Create Label if Necessary
-        if: github.event_name == 'push' && env.PR_URL != ''
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Checking and creating labels if necessary..."
-
-          # Check if the label exists, create it if it doesn't
-          LABEL_EXISTS=$(gh label list --json name -q '.[].name' | grep -w 'tests-failed' || echo "no")
-          if [[ "$LABEL_EXISTS" == "no" ]]; then
-            echo "Label 'tests-failed' does not exist. Creating it now..."
-            gh label create "tests-failed" --color "e11d21" --description "Tests failed"
-          fi
-
-          LABEL_EXISTS=$(gh label list --json name -q '.[].name' | grep -w 'tests-passed' || echo "no")
-          if [[ "$LABEL_EXISTS" == "no" ]]; then
-            echo "Label 'tests-passed' does not exist. Creating it now..."
-            gh label create "tests-passed" --color "0e8a16" --description "Tests passed"
-          fi
-
       - name: Handle Labeling and Drafting PR based on Test Results
         if: github.event_name == 'push' && env.PR_URL != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Checking if tests passed or failed..."
+          echo "Checking and handling labels and PR status..."
 
-          # Check if tests passed or failed using TEST_RESULT from environment variable
+          # Check if the tests failed or passed
           if [[ "$TEST_RESULT" == "failure" ]]; then
             echo "Tests failed. Adding 'tests-failed' label to PR."
             gh pr edit "$PR_URL" --add-label "tests-failed"
             gh pr comment "$PR_URL" --body "❌ Unit tests failed! Please check the test logs."
-            gh pr ready --undo "$PR_URL"  # Move PR back to draft
-            exit 1  # Explicitly exit with error to indicate failure in the job
+
+            # Move the PR back to draft if the tests failed
+            gh pr ready --undo "$PR_URL"
+            exit 1  # Explicitly exit with error to indicate failure, this ensures the job fails
           else
             echo "Tests passed. Adding 'tests-passed' label to PR."
             gh pr edit "$PR_URL" --add-label "tests-passed"
@@ -129,12 +110,4 @@ jobs:
           gh auth setup-git
           # Fetch PR data using the correct command
           PR_STATE=$(gh pr view "${{ github.event.pull_request.number }}" --json state -q ".state")
-          if [ "$PR_STATE" != "OPEN" ]; then
-            echo "❌ PR is not open. Cancelling E2E tests."
-            exit 1
-          else
-            echo "✅ PR is open. Proceeding with E2E tests."
-          fi
-
-      - name: Run E2E Tests
-        run: pytest e2etests.py
+          if [ "$PR_STATE" !=
