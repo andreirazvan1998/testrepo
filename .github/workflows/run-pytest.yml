@@ -1,17 +1,15 @@
-name: Run Pytest
+name: PR Test and Label Update
 
 on:
-  workflow_dispatch:
-    inputs:
-      run_pytest:
-        description: 'Run Pytest'
-        required: true
-        default: 'true'
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
 
 jobs:
-  pytest_execution:
+  run_pytest:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -28,21 +26,49 @@ jobs:
 
       - name: Run pytest
         id: pytest
+        continue-on-error: true  # Aceasta permite ca workflow-ul să nu se oprească chiar dacă testele pică
         run: |
           pytest test_script.py
-          echo "Test status: $?"
+          echo "Test status: $?"  # Afișează statusul testului
 
-      - name: Set PR label based on pytest result
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  update_label:
+    needs: run_pytest
+    runs-on: ubuntu-latest
+    if: ${{ always() }}  # Aceasta se asigură că job-ul de actualizare a etichetei se va rula întotdeauna
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Token-ul GitHub pentru modificarea etichetelor
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Get current labels
+        id: get_labels
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
+          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels | map(.name) | join(",")')
+          echo "Current labels: $LABELS"
+          echo "LABELS=$LABELS" >> $GITHUB_ENV
+
+      - name: Set PR label based on pytest result
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          echo "PR Number: $PR_NUMBER"
+          
+          # Verifică dacă eticheta "tests-passed" există deja
+          if [[ "$LABELS" == *"tests-passed"* ]]; then
+            echo "tests-passed already exists, skipping add."
+            gh pr edit $PR_NUMBER --remove-label tests-failed  # Șterge eticheta de failure, dacă există
+          elif [[ "$LABELS" == *"tests-failed"* ]]; then
+            echo "tests-failed already exists, skipping add."
+            gh pr edit $PR_NUMBER --remove-label tests-passed  # Șterge eticheta de success, dacă există
+          fi
+          
+          # Dacă testele au trecut
           if [ ${{ steps.pytest.outcome }} == 'success' ]; then
             echo "Tests passed, setting 'tests-passed' label."
             gh pr edit $PR_NUMBER --add-label tests-passed
-            gh pr edit $PR_NUMBER --remove-label tests-failed
+          # Dacă testele au eșuat
           else
             echo "Tests failed, setting 'tests-failed' label."
             gh pr edit $PR_NUMBER --add-label tests-failed
-            gh pr edit $PR_NUMBER --remove-label tests-passed
           fi
