@@ -56,7 +56,7 @@ jobs:
           gh pr ready --undo "$PR_URL"
           gh pr comment "$PR_URL" --body "🚨 Unit tests failed in Draft. They will rerun when PR is reopened."
           gh pr edit "$PR_URL" --add-label "tests-failed"
-          gh pr edit "$PR_URL" --remove-label "tests-passed"
+          gh pr edit "$PR_URL" --remove-label "tests-passed" || echo "tests-passed label not found"
 
       - name: Mark PR as Passed if Tests Succeed
         if: success() && github.event_name == 'push' && env.PR_URL != ''
@@ -69,7 +69,7 @@ jobs:
           gh api repos/${{ github.repository }}/labels -X POST -f name="tests-passed" -f color="0e8a16"
           # Add label and remove failure label if tests pass
           gh pr edit "$PR_URL" --add-label "tests-passed"
-          gh pr edit "$PR_URL" --remove-label "tests-failed"
+          gh pr edit "$PR_URL" --remove-label "tests-failed" || echo "tests-failed label not found"
           gh pr comment "$PR_URL" --body "✅ Unit tests passed. They won't rerun when PR is reopened."
 
   e2e_tests:
