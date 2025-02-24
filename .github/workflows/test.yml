@@ -16,8 +16,9 @@ jobs:
 
   unit_tests:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'pull_request'  # Always run on push, conditionally run on PR open
-
+    if: |
+      github.event_name == 'push' || 
+      (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'tests-passed'))
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -36,19 +37,17 @@ jobs:
         id: pytest
         run: pytest test_script.py
 
-      - name: Check if PR Exists
-        id: check_pr
+      - name: Get PR URL
+        id: pr_url
         if: github.event_name == 'push'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh auth setup-git
           PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url' || echo "")
-          if [ -n "$PR_URL" ]; then
-            echo "PR_URL=$PR_URL" >> $GITHUB_ENV
-          fi
+          echo "PR_URL=$PR_URL" >> $GITHUB_ENV
 
-      - name: Move PR to Draft if Tests Fail
+      - name: Move PR to Draft & Add Label if Tests Fail
         if: failure() && github.event_name == 'push' && env.PR_URL != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -56,15 +55,17 @@ jobs:
           echo "❌ Unit tests failed, moving PR back to draft."
           gh pr ready --undo "$PR_URL"
           gh pr comment "$PR_URL" --body "🚨 Unit tests failed in Draft. They will rerun when PR is reopened."
-          echo "UNIT_TESTS_FAILED=true" >> $GITHUB_ENV
+          gh pr edit "$PR_URL" --add-label "tests-failed"
+          gh pr edit "$PR_URL" --remove-label "tests-passed"
 
-      - name: Remove Failure Marker if Tests Pass
+      - name: Mark PR as Passed if Tests Succeed
         if: success() && github.event_name == 'push' && env.PR_URL != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh pr comment "$PR_URL" --body "✅ Unit tests passed. They won't rerun when PR is reopened."
-          echo "UNIT_TESTS_FAILED=false" >> $GITHUB_ENV
+          gh pr edit "$PR_URL" --add-label "tests-passed"
+          gh pr edit "$PR_URL" --remove-label "tests-failed"
 
   e2e_tests:
     needs: unit_tests
