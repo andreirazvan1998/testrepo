@@ -4,6 +4,7 @@ on:
   pull_request:
     types:
       - opened  # Trigger only when PR is opened
+      - ready_for_review
 
 jobs:
   trigger_tests:
