@@ -1,5 +1,4 @@
-name: PR Test and Label Update
-
+name: "PR Test and Label Update"
 on:
   workflow_dispatch:  # Allow manual trigger or external trigger via API
   pull_request:
