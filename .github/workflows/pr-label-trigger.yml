@@ -37,6 +37,15 @@ jobs:
           echo "LABELS=$LABELS" >> $GITHUB_ENV
           echo "CURRENT_BRANCH=$CURRENT_BRANCH" >> $GITHUB_ENV
 
+      - name: Debugging Labels
+        run: |
+          echo "Current labels: $LABELS"
+          if [[ "$LABELS" == *"tests-failed"* ]]; then
+            echo "The label 'tests-failed' is present!"
+          else
+            echo "The label 'tests-failed' is NOT present."
+          fi
+
       - name: Trigger Test Workflow if Label is `tests-failed`
         run: |
           # Only trigger tests if label is 'tests-failed'
