@@ -37,7 +37,7 @@ jobs:
         id: pytest
         run: pytest test_script.py
 
-      - name: Get PR URL
+      - name: Get PR URL (Only for push events)
         id: pr_url
         if: github.event_name == 'push'
         env:
@@ -46,6 +46,7 @@ jobs:
           gh auth setup-git
           PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url' || echo "")
           echo "PR_URL=$PR_URL" >> $GITHUB_ENV
+          echo "PR URL: $PR_URL"  # Debugging line
 
       - name: Move PR to Draft & Add Label if Tests Fail
         if: failure() && github.event_name == 'push' && env.PR_URL != ''
@@ -55,8 +56,14 @@ jobs:
           echo "❌ Unit tests failed, moving PR back to draft."
           gh pr ready --undo "$PR_URL"
           gh pr comment "$PR_URL" --body "🚨 Unit tests failed in Draft. They will rerun when PR is reopened."
-          gh pr edit "$PR_URL" --add-label "tests-failed"
+          # Debugging: Check the existing labels
+          echo "Checking existing labels on PR..."
+          gh pr view "$PR_URL" --json labels -q '.labels[].name'
+          # Remove the "tests-passed" label if exists
           gh pr edit "$PR_URL" --remove-label "tests-passed" || echo "tests-passed label not found"
+          # Add "tests-failed" label
+          gh pr edit "$PR_URL" --add-label "tests-failed"
+          echo "Added 'tests-failed' label."
 
       - name: Mark PR as Passed if Tests Succeed
         if: success() && github.event_name == 'push' && env.PR_URL != ''
@@ -64,10 +71,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh auth setup-git
-          # Ensure the label exists before adding it
+          # Ensure the 'tests-passed' label exists before adding it
+          echo "Checking for existing 'tests-passed' label..."
           gh api repos/${{ github.repository }}/labels --jq '.[].name' | grep -qx "tests-passed" || \
           gh api repos/${{ github.repository }}/labels -X POST -f name="tests-passed" -f color="0e8a16"
-          # Add label and remove failure label if tests pass
+          # Add the "tests-passed" label and remove "tests-failed"
           gh pr edit "$PR_URL" --add-label "tests-passed"
           gh pr edit "$PR_URL" --remove-label "tests-failed" || echo "tests-failed label not found"
           gh pr comment "$PR_URL" --body "✅ Unit tests passed. They won't rerun when PR is reopened."
