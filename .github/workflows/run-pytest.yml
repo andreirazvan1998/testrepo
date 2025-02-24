@@ -49,11 +49,12 @@ jobs:
           echo "Current labels: $LABELS"
           echo "LABELS=$LABELS" >> $GITHUB_ENV
 
-      - name: Set PR label based on pytest result
+      - name: Check pytest result and update label
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
           echo "PR Number: $PR_NUMBER"
-          
+          echo "Pytest outcome: ${{ steps.pytest.outcome }}"
+
           # Verifică statusul pytest
           if [ "${{ steps.pytest.outcome }}" == "success" ]; then
             echo "Tests passed, setting 'tests-passed' label."
