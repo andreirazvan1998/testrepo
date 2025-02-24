@@ -28,17 +28,25 @@ jobs:
           PR_STATE=$(gh pr view $PR_NUMBER --json state -q '.state')
           LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels | map(.name) | join(" ")')
 
+          echo "PR Number: $PR_NUMBER"
           echo "PR State: $PR_STATE"
           echo "Current labels: $LABELS"
 
           if [[ "$PR_STATE" == "OPEN" && "$LABELS" == *"tests-failed"* ]]; then
             echo "PR is OPEN and has 'tests-failed'. Running tests."
+            echo "run_tests=true" >> $GITHUB_ENV
             echo "run_tests=true" >> $GITHUB_OUTPUT
+          elif [[ "$PR_STATE" == "OPEN" && "$LABELS" == *"tests-passed"* ]]; then
+            echo "PR is OPEN and tests are already passed. Skipping tests."
+            echo "run_tests=false" >> $GITHUB_ENV
+            echo "run_tests=false" >> $GITHUB_OUTPUT
           elif [[ "${{ github.event.action }}" == "synchronize" ]]; then
             echo "Code updated, running tests."
+            echo "run_tests=true" >> $GITHUB_ENV
             echo "run_tests=true" >> $GITHUB_OUTPUT
           else
             echo "No need to run tests."
+            echo "run_tests=false" >> $GITHUB_ENV
             echo "run_tests=false" >> $GITHUB_OUTPUT
 
   run_pytest:
