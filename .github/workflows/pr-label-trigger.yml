@@ -11,7 +11,7 @@ on:
       - ready_for_review  # Listen for ready_for_review event
 
 jobs:
-  trigger_tests:
+  check_label:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -37,7 +37,8 @@ jobs:
           echo "CURRENT_BRANCH=$CURRENT_BRANCH" >> $GITHUB_ENV
           echo "PR_STATE=$PR_STATE" >> $GITHUB_ENV
 
-      - name: Trigger Test Workflow
+      - name: Check if Tests Should Run
+        id: check_tests
         run: |
           echo "Evaluating PR state and labels..."
           echo "PR State: $PR_STATE"
@@ -45,11 +46,15 @@ jobs:
           
           # Check if the PR is open and the label contains 'tests-failed'
           if [[ "$PR_STATE" == "open" ]] && [[ "$LABELS" == *"tests-failed"* ]]; then
-            echo "Triggering the test run because the label is 'tests-failed' and PR is open."
-            curl -X POST -u "token:${{ secrets.GITHUB_TOKEN }}" \
-              -H "Accept: application/vnd.github.v3+json" \
-              --data '{"ref":"refs/heads/'"${CURRENT_BRANCH}"'"}' \
-              https://api.github.com/repos/${{ github.repository }}/actions/workflows/pr-test-and-label-update.yml/dispatches
+            echo "Tests should run (PR is open and label is 'tests-failed')"
+            echo "run_tests=true" >> $GITHUB_ENV
           else
-            echo "Skipping trigger: Either PR is not open or label is not 'tests-failed'."
+            echo "Tests should NOT run (PR is not open or label is not 'tests-failed')"
+            echo "run_tests=false" >> $GITHUB_ENV
           fi
+
+      - name: Trigger next workflow if needed
+        if: ${{ env.run_tests == 'true' }}
+        run: |
+          echo "Triggering 'pr-test-and-label-update' workflow because the label is 'tests-failed' and PR is open."
+          gh workflow run pr-test-and-label-update.yml --ref ${{ github.ref }}
