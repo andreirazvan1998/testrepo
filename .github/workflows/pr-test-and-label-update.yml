@@ -4,6 +4,12 @@ on:
   repository_dispatch:
     types:
       - trigger-pr-test  # Custom event type to trigger the workflow
+  
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened  # Trigger when a PR is opened, synchronized, or reopened
 
 jobs:
   run_pytest:
