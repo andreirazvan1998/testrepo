@@ -3,8 +3,12 @@ name: Trigger PR Test on Label Change
 on:
   pull_request:
     types:
-      - opened  # Trigger only when PR is opened
-      - ready_for_review  # Trigger when PR is ready for review
+      - opened
+      - synchronize
+      - reopened
+      - labeled
+      - unlabeled
+      - ready_for_review  # Listen for ready_for_review event
 
 jobs:
   trigger_tests:
@@ -13,23 +17,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Authenticate GitHub CLI
-        run: |
-          # Clear any existing GH_TOKEN environment variable before using the GitHub CLI
-          unset GH_TOKEN
-          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+      - name: Set GH_TOKEN environment variable
+        run: echo "GH_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
 
-      - name: Log PR information
+      - name: Get PR Number and Labels
+        id: get_pr_info
         run: |
-          echo "PR Title: ${{ github.event.pull_request.title }}"
-          echo "PR Number: ${{ github.event.pull_request.number }}"
-          echo "Ref for PR: ${{ github.head_ref }}"
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          # Explicitly set GH_TOKEN in the environment variable for gh
+          export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          CURRENT_BRANCH=${{ github.head_ref }}  # Get the current branch of the PR
+          echo "PR Number: $PR_NUMBER"
+          echo "Current Branch: $CURRENT_BRANCH"
+          echo "CURRENT_BRANCH=$CURRENT_BRANCH" >> $GITHUB_ENV
 
-       - name: Trigger PR Test Workflow
+      - name: Trigger Test Workflow Unconditionally
         run: |
-          echo "Triggering PR Test Workflow via repository_dispatch."
-          curl -X POST \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/dispatches \
-            -d '{"event_type": "trigger-pr-test", "client_payload": {"pull_request": {"number": "${{ github.event.pull_request.number }}"}}}'
+          echo "Triggering the test run unconditionally"
+          gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}
