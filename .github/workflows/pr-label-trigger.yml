@@ -1,11 +1,9 @@
 name: Trigger PR Test and Label Update
 
 on:
-  workflow_dispatch:  # Allows manual trigger
-  workflow_run:
-    workflows: ["Run Tests"]  # Replace with your actual workflow name
+  pull_request:
     types:
-      - completed
+      - ready_for_review  # Trigger when PR is moved from Draft to Open
 
 jobs:
   trigger_pr_test:
