@@ -3,9 +3,6 @@ name: PR Test and Label Update
 on:
   repository_dispatch:
     types: [trigger-pr-test]  # Triggered from the "Trigger PR Test" workflow
-  pull_request:
-    types:
-      - ready_for_review  # Ensure it's triggered when PR moves to Open
 
 jobs:
   run_pytest:
