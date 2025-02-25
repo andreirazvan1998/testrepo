@@ -1,22 +1,18 @@
 name: PR Test and Label Update
 
 on:
-  workflow_dispatch:  
+  workflow_dispatch:  # Allows the workflow to be triggered manually
   repository_dispatch:
     types: [trigger-pr-test]
   push:
     branches:
-      - '**'
-  workflow_run:
-    workflows: ["Trigger PR Test and Label Update"]
-    types:
-      - completed
+      - '**'  # Runs on all branches
 
 jobs:
   run_pytest:
     runs-on: ubuntu-latest
     outputs:
-      result: ${{ steps.pytest.outcome }}  # Capture pytest outcome
+      result: ${{ steps.pytest.outcome }}  # Saving test result for the label update
 
     steps:
       - name: Checkout repository
@@ -34,15 +30,14 @@ jobs:
 
       - name: Run pytest
         id: pytest
-        continue-on-error: true  # Continue even if tests fail
         run: |
-          pytest test_script.py
+          pytest test_script.py  # No `continue-on-error: true` to make pytest result visible in PR checks
         shell: bash
 
   update_label:
     needs: run_pytest
     runs-on: ubuntu-latest
-    if: always()  # Always run the labeling part
+    if: always()  # Run regardless of pytest result
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -71,7 +66,7 @@ jobs:
             echo "❌ Tests failed! Setting label to 'tests-failed'"
             gh pr edit $PR_NUMBER --remove-label tests-passed || true
             gh pr edit $PR_NUMBER --add-label tests-failed
-            # Check if PR is open and move to draft
+            # Check if PR is open, and move it to draft if needed
             PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url')
             if [ -n "$PR_URL" ]; then
               echo "🔄 Moving PR back to draft due to failed tests."
