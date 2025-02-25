@@ -17,9 +17,9 @@ jobs:
   e2e_tests:
     needs: unit_tests  # Make sure unit tests have run successfully
     if: |
-      github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' &&
-      github.event.pull_request.state == 'open' &&
-      contains(github.event.pull_request.labels.*.name, 'tests-passed') &&
+      github.event_name == 'pull_request' && 
+      github.event.pull_request.state == 'open' && 
+      contains(github.event.pull_request.labels.*.name, 'tests-passed') && 
       success()  # Ensure previous tests have passed
     
     runs-on: ubuntu-latest
