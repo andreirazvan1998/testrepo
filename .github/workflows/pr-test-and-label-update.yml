@@ -57,7 +57,7 @@ jobs:
           echo "Current labels: $LABELS"
           echo "LABELS=$LABELS" >> $GITHUB_ENV
 
-      - name: Update PR Label
+      - name: Update PR Label and Set Draft if Tests Fail
         run: |
           if [ "${{ needs.run_pytest.outputs.result }}" == "success" ]; then
             echo "✅ Tests passed! Setting label to 'tests-passed'"
@@ -67,4 +67,6 @@ jobs:
             echo "❌ Tests failed! Setting label to 'tests-failed'"
             gh pr edit $PR_NUMBER --remove-label tests-passed || true
             gh pr edit $PR_NUMBER --add-label tests-failed
+            # Switch the PR to draft if tests fail
+            gh pr edit $PR_NUMBER --draft
           fi
