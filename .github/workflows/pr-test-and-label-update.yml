@@ -2,8 +2,10 @@ name: PR Test and Label Update
 
 on:
   workflow_dispatch:  # Allows the workflow to be triggered manually
-  repository_dispatch:
-    types: [trigger-pr-test]
+  workflow_run:
+    workflows: ["Trigger PR Test and Label Update"]
+    types:
+      - completed 
   push:
     branches:
       - '**'  # Runs on all branches
