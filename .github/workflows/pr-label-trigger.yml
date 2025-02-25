@@ -6,7 +6,7 @@ on:
       - ready_for_review  # Triggered when PR is moved from Draft to Open
 
 jobs:
-  trigger_pr_test:
+  handle_labels:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,22 +16,26 @@ jobs:
       - name: Set GH_TOKEN environment variable
         run: echo "GH_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
 
-      - name: Check if the PR is open and labeled 'tests-failed'
+      - name: Check if the PR is labeled 'tests-failed'
         id: check_labels
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
           LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name')
           echo "Current labels: $LABELS"
           if echo "$LABELS" | grep -q "tests-failed"; then
-            echo "✅ 'tests-failed' label found, triggering the workflow."
-            echo "trigger=true" >> $GITHUB_ENV
+            echo "✅ 'tests-failed' label found, putting the PR back to draft."
+            echo "move_to_draft=true" >> $GITHUB_ENV
+            # Put the PR back to draft if 'tests-failed' label is present
+            gh pr ready --undo $PR_NUMBER
           else
-            echo "❌ 'tests-failed' label not found, skipping the workflow trigger."
-            echo "trigger=false" >> $GITHUB_ENV
+            echo "❌ 'tests-failed' label not found, no action needed."
+            echo "move_to_draft=false" >> $GITHUB_ENV
           fi
 
-      - name: Trigger Test Workflow if 'tests-failed' label is present
-        if: env.trigger == 'true'  # Only trigger if the PR is open and labeled 'tests-failed'
+      - name: Handle PR status based on label
         run: |
-          echo "Triggering the test run unconditionally"
-          gh workflow run pr-test-and-label-update.yml -r ${{ github.head_ref }}
+          if [ "${{ env.move_to_draft }}" == "true" ]; then
+            echo "The PR was moved to draft due to the 'tests-failed' label."
+          else
+            echo "No action was required as the PR does not have the 'tests-failed' label."
+          fi
