@@ -37,7 +37,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Ensure GH_TOKEN is available for authentication
         run: |
-          # GitHub CLI should automatically authenticate using the GITHUB_TOKEN variable
           PR_STATE=$(gh pr view "${{ github.event.pull_request.number }}" --json state -q ".state")
           PR_LABELS=$(gh pr view "${{ github.event.pull_request.number }}" --json labels -q '.labels[].name')
           
@@ -58,13 +57,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Ensure GH_TOKEN is available for authentication
         run: |
-          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
+          # Get the current PR URL dynamically
+          PR_URL=$(gh pr list --head ${{ github.head_ref }} --state open --json url -q '.[0].url')
           echo "PR_URL: $PR_URL"
           if [ -n "$PR_URL" ]; then
             echo "PR_EXISTS=true" >> $GITHUB_ENV
             echo "✅ PR exists, ready to update."
           else
-            echo "❌ No open PR found. Skipping PR update."
+            echo "❌ No open PR found for the current branch."
             exit 1
           fi
 
@@ -74,7 +74,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Ensure GH_TOKEN is available for authentication
         run: |
           echo "Checking if the PR exists and is open..."
-          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
+          PR_URL=$(gh pr list --head ${{ github.head_ref }} --state open --json url -q '.[0].url')
           echo "PR URL: $PR_URL"
           
           # Check if PR_URL is set
