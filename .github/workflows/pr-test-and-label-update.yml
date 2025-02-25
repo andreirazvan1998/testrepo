@@ -2,8 +2,7 @@ name: PR Test and Label Update
 
 on:
   repository_dispatch:
-    types:
-      - trigger-pr-test  # Custom event type to trigger the workflow
+    types: [trigger-pr-test]  # Custom event type to trigger the workflow
   
   pull_request:
     types:
