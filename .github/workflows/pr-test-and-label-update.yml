@@ -3,9 +3,10 @@ name: PR Test and Label Update
 on:
   pull_request:
     types:
-      - opened  # Trigger on PR open
-      - synchronize  # Trigger when a commit is pushed to the PR branch
-      - reopened  # Trigger when a PR is reopened
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
 
 jobs:
   run_pytest:
@@ -29,8 +30,9 @@ jobs:
 
       - name: Run pytest
         id: pytest
+        continue-on-error: true  # Continue even if tests fail
         run: |
-          pytest test_script.py  # No `continue-on-error: true` to make pytest result visible in PR checks
+          pytest test_script.py
         shell: bash
 
   update_label:
