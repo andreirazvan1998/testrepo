@@ -22,7 +22,31 @@ jobs:
           echo "Repository: ${{ github.repository }}"
           echo "Event Type: trigger-pr-test"
 
+      - name: Get PR Number
+        id: get_pr
+        run: |
+          PR_NUMBER=$(gh pr list --head "${{ github.ref_name }}" --state open --json number -q '.[0].number')
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
+
+      - name: Check if the PR is open and labeled 'tests-failed'
+        id: check_labels
+        run: |
+          if [ -n "$PR_NUMBER" ]; then
+            LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name')
+            echo "Current labels: $LABELS"
+            if echo "$LABELS" | grep -q "tests-failed"; then
+              echo "✅ 'tests-failed' label found, triggering the workflow."
+              echo "trigger=true" >> $GITHUB_ENV
+            else
+              echo "❌ 'tests-failed' label not found, skipping the workflow trigger."
+              echo "trigger=false" >> $GITHUB_ENV
+            fi
+          else
+            echo "❌ PR not found."
+            echo "trigger=false" >> $GITHUB_ENV
+
       - name: Trigger Test Workflow Unconditionally
+        if: env.trigger == 'true'  # Only trigger if the PR is open and labeled 'tests-failed'
         run: |
           echo "Triggering the test run unconditionally"
           gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}
