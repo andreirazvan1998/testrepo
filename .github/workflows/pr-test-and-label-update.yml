@@ -30,9 +30,8 @@ jobs:
 
       - name: Run pytest
         id: pytest
-        continue-on-error: true  # Continue even if tests fail
         run: |
-          pytest test_script.py
+          pytest test_script.py  # No `continue-on-error: true` to make pytest result visible in PR checks
         shell: bash
 
   update_label:
