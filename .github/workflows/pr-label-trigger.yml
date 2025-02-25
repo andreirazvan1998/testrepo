@@ -10,8 +10,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-       - name: Checkout repository
-         uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v3  # Use the latest stable version of actions/checkout
 
       - name: Set GH_TOKEN environment variable
         run: echo "GH_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
@@ -25,4 +25,4 @@ jobs:
       - name: Trigger Test Workflow Unconditionally
         run: |
           echo "Triggering the test run unconditionally"
-          gh workflow run pr-test-and-label-update.yml --ref test3
+          gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}
