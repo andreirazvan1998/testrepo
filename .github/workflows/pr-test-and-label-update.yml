@@ -4,9 +4,9 @@ on:
   workflow_dispatch:  # Allows the workflow to be triggered manually
   repository_dispatch:
     types: [trigger-pr-test]
-  pull_request:
-    types:
-      - push
+  push:
+    branches:
+      - '**'  # Runs on all branches
 
 jobs:
   run_pytest:
