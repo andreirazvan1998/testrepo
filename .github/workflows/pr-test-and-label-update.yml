@@ -72,7 +72,7 @@ jobs:
             echo "❌ Tests failed! Setting label to 'tests-failed'"
             gh pr edit $PR_NUMBER --remove-label tests-passed || true
             gh pr edit $PR_NUMBER --add-label tests-failed
-
             PR_URL=$(gh pr view $PR_NUMBER --json url -q '.url')
             echo "🔄 Moving PR back to draft due to failed tests."
             gh pr ready --undo "$PR_URL"
+          fi
