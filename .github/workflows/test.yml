@@ -1,13 +1,9 @@
 name: Run Pytest on PR
 
 on:
-  push:
-    branches:
-      - '**'  # Runs on all branches
   pull_request:
     types:
-      - ready_for_review  # Trigger when PR is moved from draft to open
-  workflow_dispatch:  # Allows manual execution of tests
+      - ready_for_review  # Triggered when PR is moved from Draft to Open
 
 permissions:
   pull-requests: write
