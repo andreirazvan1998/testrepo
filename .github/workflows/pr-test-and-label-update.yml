@@ -40,10 +40,9 @@ jobs:
         id: test_status
         run: |
           if [ $? -eq 0 ]; then
-            echo "::set-output name=result::success"
+            echo "result=success" >> $GITHUB_ENV
           else
-            echo "::set-output name=result::failure"
-          fi
+            echo "result=failure" >> $GITHUB_ENV
 
   check_labels:
     runs-on: ubuntu-latest
@@ -103,10 +102,9 @@ jobs:
         id: test_status
         run: |
           if [ $? -eq 0 ]; then
-            echo "::set-output name=result::success"
+            echo "result=success" >> $GITHUB_ENV
           else
-            echo "::set-output name=result::failure"
-          fi
+            echo "result=failure" >> $GITHUB_ENV
 
   update_label:
     runs-on: ubuntu-latest
@@ -119,10 +117,18 @@ jobs:
       - name: Get PR Number
         run: echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
 
+      - name: Get Test Result
+        run: |
+          TEST_RESULT="${{ needs.run_pytest.outputs.result }}"
+          if [[ -z "$TEST_RESULT" ]]; then
+            TEST_RESULT="${{ needs.run_pytest_if_needed.outputs.result }}"
+          fi
+          echo "Final test result: $TEST_RESULT"
+          echo "TEST_RESULT=$TEST_RESULT" >> $GITHUB_ENV
+
       - name: Update PR Label and Set Draft if Tests Fail
         run: |
-          TEST_RESULT="${{ needs.run_pytest.outputs.result || needs.run_pytest_if_needed.outputs.result }}"
-          if [ "$TEST_RESULT" == "success" ]; then
+          if [[ "$TEST_RESULT" == "success" ]]; then
             echo "✅ Tests passed! Setting label to 'tests-passed'"
             gh pr edit $PR_NUMBER --remove-label tests-failed || true
             gh pr edit $PR_NUMBER --add-label tests-passed
