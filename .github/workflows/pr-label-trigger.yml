@@ -34,4 +34,3 @@ jobs:
         if: env.trigger == 'true'  # Only trigger if the PR is open and labeled 'tests-failed'
         run: |
           echo "Triggering the test run unconditionally"
-          gh workflow run pr-test-and-label-update.yml -r ${{ github.head_ref }} -F trigger=true
