@@ -57,6 +57,9 @@ jobs:
 
       - name: Notify Users for Review
         if: success()  # Run only if E2E tests pass
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "✅ E2E tests passed. Notifying users for review."
-          gh pr review ${{ github.event.pull_request.number }} --approve --body "Tests passed, ready for review."
+          # Approve the PR and add a reviewer
+          gh pr request-reviewer ${{ github.event.pull_request.number }} --reviewer andreirazvan1998
