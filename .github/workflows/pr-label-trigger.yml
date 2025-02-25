@@ -4,6 +4,7 @@ on:
   pull_request:
     types:
       - ready_for_review  # Triggered when PR is moved from Draft to Open
+      - reopened          # Triggered when PR is reopened
 
 jobs:
   trigger_pr_test:
@@ -41,4 +42,4 @@ jobs:
         if: env.trigger == 'true'  # Only trigger if the PR is open and labeled 'tests-failed'
         run: |
           echo "Triggering the test run unconditionally"
-          gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}
+          gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}  # Trigger the test workflow
