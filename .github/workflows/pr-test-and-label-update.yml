@@ -1,8 +1,9 @@
 name: PR Test and Label Update
 
 on:
+  workflow_dispatch:  # Allows the workflow to be triggered manually
   repository_dispatch:
-    types: [trigger-pr-test]  # Triggered from the "Trigger PR Test" workflow
+    types: [trigger-pr-test]
 
 jobs:
   run_pytest:
