@@ -16,7 +16,7 @@ jobs:
   run_pytest:
     runs-on: ubuntu-latest
     outputs:
-      result: ${{ steps.pytest.outcome }}
+      result: ${{ steps.pytest.outcome }}  # Capture pytest outcome
 
     steps:
       - name: Checkout repository
@@ -34,7 +34,7 @@ jobs:
 
       - name: Run pytest
         id: pytest
-        continue-on-error: true
+        continue-on-error: true  # Continue even if tests fail
         run: |
           pytest test_script.py
         shell: bash
@@ -42,7 +42,7 @@ jobs:
   update_label:
     needs: run_pytest
     runs-on: ubuntu-latest
-    if: always()
+    if: always()  # Always run the labeling part
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
