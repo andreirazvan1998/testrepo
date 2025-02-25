@@ -37,7 +37,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Set GH_TOKEN
         run: |
-          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"  # Authenticate GitHub CLI
+          # GitHub CLI already authenticates automatically, so no need for 'gh auth login'
           PR_STATE=$(gh pr view "${{ github.event.pull_request.number }}" --json state -q ".state")
           PR_LABELS=$(gh pr view "${{ github.event.pull_request.number }}" --json labels -q '.labels[].name')
           
