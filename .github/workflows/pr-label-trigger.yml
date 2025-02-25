@@ -3,7 +3,7 @@ name: Trigger PR Test and Label Update
 on:
   pull_request:
     types:
-      - ready_for_review  # Trigger when PR is moved from Draft to Open
+      - ready_for_review  # Triggered when PR is moved from Draft to Open
 
 jobs:
   trigger_pr_test:
