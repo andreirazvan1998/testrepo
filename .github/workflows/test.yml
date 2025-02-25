@@ -13,7 +13,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  
+
   e2e_tests:
     if: github.event_name == 'pull_request' && github.event.pull_request.state == 'open' && contains(github.event.pull_request.labels.*.name, 'tests-passed') && success() 
     
@@ -54,6 +54,18 @@ jobs:
 
       - name: Run E2E Tests
         run: pytest e2etests.py
+
+      - name: Set PR_EXISTS variable to true
+        run: |
+          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
+          echo "PR_URL: $PR_URL"
+          if [ -n "$PR_URL" ]; then
+            echo "PR_EXISTS=true" >> $GITHUB_ENV
+            echo "✅ PR exists, ready to update."
+          else
+            echo "❌ No open PR found. Skipping PR update."
+            exit 1
+          fi
 
       - name: Update Existing PR (if PR exists)
         if: env.PR_EXISTS == 'true' && success()  # Only run if PR exists and tests passed
