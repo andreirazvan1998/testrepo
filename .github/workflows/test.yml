@@ -35,10 +35,9 @@ jobs:
 
       - name: Verify PR is Open and has 'tests-passed' label
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Set GH_TOKEN
         run: |
-          gh auth setup-git
-          # Fetch PR data and check if it is open and labeled 'tests-passed'
+          gh auth login --with-token < "${{ secrets.GITHUB_TOKEN }}"  # Authenticate GitHub CLI
           PR_STATE=$(gh pr view "${{ github.event.pull_request.number }}" --json state -q ".state")
           PR_LABELS=$(gh pr view "${{ github.event.pull_request.number }}" --json labels -q '.labels[].name')
           
@@ -70,7 +69,7 @@ jobs:
       - name: Update Existing PR (if PR exists)
         if: env.PR_EXISTS == 'true' && success()  # Only run if PR exists and tests passed
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Ensure GH_TOKEN is set
         run: |
           echo "Checking if the PR exists and is open..."
           PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
