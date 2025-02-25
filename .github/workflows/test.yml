@@ -35,9 +35,9 @@ jobs:
 
       - name: Verify PR is Open and has 'tests-passed' label
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Set GH_TOKEN
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Ensure GH_TOKEN is available for authentication
         run: |
-          # GitHub CLI already authenticates automatically, so no need for 'gh auth login'
+          # GitHub CLI should automatically authenticate using the GITHUB_TOKEN variable
           PR_STATE=$(gh pr view "${{ github.event.pull_request.number }}" --json state -q ".state")
           PR_LABELS=$(gh pr view "${{ github.event.pull_request.number }}" --json labels -q '.labels[].name')
           
@@ -55,6 +55,8 @@ jobs:
         run: pytest e2etests.py
 
       - name: Set PR_EXISTS variable to true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Ensure GH_TOKEN is available for authentication
         run: |
           PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
           echo "PR_URL: $PR_URL"
@@ -69,7 +71,7 @@ jobs:
       - name: Update Existing PR (if PR exists)
         if: env.PR_EXISTS == 'true' && success()  # Only run if PR exists and tests passed
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Ensure GH_TOKEN is set
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Ensure GH_TOKEN is available for authentication
         run: |
           echo "Checking if the PR exists and is open..."
           PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
