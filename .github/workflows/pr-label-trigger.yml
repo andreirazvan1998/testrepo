@@ -44,6 +44,7 @@ jobs:
           else
             echo "❌ PR not found."
             echo "trigger=false" >> $GITHUB_ENV
+          fi  # Add the missing 'fi' here to close the 'if' block
 
       - name: Trigger Test Workflow Unconditionally
         if: env.trigger == 'true'  # Only trigger if the PR is open and labeled 'tests-failed'
