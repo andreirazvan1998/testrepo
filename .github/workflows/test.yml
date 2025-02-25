@@ -55,11 +55,9 @@ jobs:
       - name: Run E2E Tests
         run: pytest e2etests.py
 
-      - name: Notify Users for Review
-        if: success()  # Run only if E2E tests pass
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update Existing PR (if PR exists)
+        if: env.PR_EXISTS == 'true' && success()  # Only run if PR exists and tests passed
         run: |
-          echo "✅ E2E tests passed. Notifying users for review."
-          # Approve the PR and add a reviewer
-          gh pr request-reviewer ${{ github.event.pull_request.number }} --reviewer andreirazvan1998
+          echo "Tests passed, converting the PR to open"
+          PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
+          gh pr edit "$PR_URL" --add-reviewer andreirazvan1998
