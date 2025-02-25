@@ -67,6 +67,10 @@ jobs:
             echo "❌ Tests failed! Setting label to 'tests-failed'"
             gh pr edit $PR_NUMBER --remove-label tests-passed || true
             gh pr edit $PR_NUMBER --add-label tests-failed
-            # Switch the PR to draft if tests fail
-            gh pr edit $PR_NUMBER --draft
+            # Check if PR is open, and move it to draft if needed
+            PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url')
+            if [ -n "$PR_URL" ]; then
+              echo "🔄 Moving PR back to draft due to failed tests."
+              gh pr ready --undo "$PR_URL"
+            fi
           fi
