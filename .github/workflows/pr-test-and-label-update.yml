@@ -1,15 +1,11 @@
 name: PR Test and Label Update
 
 on:
-  workflow_run:
-    workflows: ["PR Test and Label Update"]
-    types:
-      - completed
   pull_request:
-    types: [opened, synchronize, reopened]
-  push:
-    branches:
-      - '**'  # Runs on all branches
+    types:
+      - opened  # Trigger on PR open
+      - synchronize  # Trigger when a commit is pushed to the PR branch
+      - reopened  # Trigger when a PR is reopened
 
 jobs:
   run_pytest:

@@ -4,7 +4,6 @@ on:
   pull_request:
     types:
       - ready_for_review  # Triggered when PR is moved from Draft to Open
-      - reopened          # Triggered when PR is reopened
 
 jobs:
   trigger_pr_test:
@@ -16,13 +15,6 @@ jobs:
 
       - name: Set GH_TOKEN environment variable
         run: echo "GH_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
-
-      - name: Debug - Check if the necessary variables are set
-        run: |
-          echo "GITHUB_TOKEN is set: ${{ secrets.GITHUB_TOKEN != '' }}"
-          echo "Repository: ${{ github.repository }}"
-          echo "Event Type: trigger-pr-test"
-          echo "PR Number: ${{ github.event.pull_request.number }}"
 
       - name: Check if the PR is open and labeled 'tests-failed'
         id: check_labels
@@ -36,10 +28,9 @@ jobs:
           else
             echo "❌ 'tests-failed' label not found, skipping the workflow trigger."
             echo "trigger=false" >> $GITHUB_ENV
-          fi
 
       - name: Trigger Test Workflow Unconditionally
         if: env.trigger == 'true'  # Only trigger if the PR is open and labeled 'tests-failed'
         run: |
           echo "Triggering the test run unconditionally"
-          gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }}  # Trigger the test workflow
+          # You no longer need to manually run the workflow here, it will automatically be triggered based on PR events.
