@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v3  # Use the latest stable version of actions/checkout
 
       - name: Set GH_TOKEN environment variable
         run: echo "GH_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
@@ -28,9 +28,10 @@ jobs:
           else
             echo "❌ 'tests-failed' label not found, skipping the workflow trigger."
             echo "trigger=false" >> $GITHUB_ENV
+          fi
 
       - name: Trigger Test Workflow if 'tests-failed' label is present
         if: env.trigger == 'true'  # Only trigger if the PR is open and labeled 'tests-failed'
         run: |
           echo "Triggering the test run unconditionally"
-          gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }} --inputs trigger=true  # Ensure proper input
+          gh workflow run pr-test-and-label-update.yml --ref ${{ github.head_ref }} --inputs trigger=true
