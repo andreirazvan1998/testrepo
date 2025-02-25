@@ -21,21 +21,12 @@ jobs:
           echo "GITHUB_TOKEN is set: ${{ secrets.GITHUB_TOKEN != '' }}"
           echo "Repository: ${{ github.repository }}"
           echo "Event Type: trigger-pr-test"
-          echo "Ref Name: ${{ github.ref_name }}"  # Check what this outputs
-
-      - name: Get PR Number
-        id: get_pr
-        run: |
-          PR_NUMBER=$(gh pr list --head "${{ github.head_ref }}" --state open --json number -q '.[0].number')
-          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
-          if [ -z "$PR_NUMBER" ]; then
-            echo "❌ No PR found for the current branch"
-            exit 1
-          fi
+          echo "PR Number: ${{ github.event.pull_request.number }}"
 
       - name: Check if the PR is open and labeled 'tests-failed'
         id: check_labels
         run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
           LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name')
           echo "Current labels: $LABELS"
           if echo "$LABELS" | grep -q "tests-failed"; then
