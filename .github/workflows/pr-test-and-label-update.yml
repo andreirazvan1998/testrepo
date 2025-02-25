@@ -1,11 +1,10 @@
 name: PR Test and Label Update
 
 on:
-  workflow_dispatch:  # Allows the workflow to be triggered manually
   workflow_run:
-    workflows: ["Trigger PR Test and Label Update"]
+    workflows: ["PR Test and Label Update"]
     types:
-      - completed 
+      - completed
   pull_request:
     types: [opened, synchronize, reopened]
   push:
