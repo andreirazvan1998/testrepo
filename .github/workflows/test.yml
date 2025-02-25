@@ -57,7 +57,18 @@ jobs:
 
       - name: Update Existing PR (if PR exists)
         if: env.PR_EXISTS == 'true' && success()  # Only run if PR exists and tests passed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Tests passed, converting the PR to open"
+          echo "Checking if the PR exists and is open..."
           PR_URL=$(gh pr list --head ${{ github.ref_name }} --state open --json url -q '.[0].url')
+          echo "PR URL: $PR_URL"
+          
+          # Check if PR_URL is set
+          if [ -z "$PR_URL" ]; then
+            echo "❌ No open PR found for the current branch."
+            exit 1
+          fi
+
+          echo "Tests passed, converting the PR to open"
           gh pr edit "$PR_URL" --add-reviewer andreirazvan1998
