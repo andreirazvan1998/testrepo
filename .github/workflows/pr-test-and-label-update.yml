@@ -6,6 +6,8 @@ on:
     workflows: ["Trigger PR Test and Label Update"]
     types:
       - completed 
+  pull_request:
+    types: [opened, synchronize, reopened]
   push:
     branches:
       - '**'  # Runs on all branches
