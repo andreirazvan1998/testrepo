@@ -1,12 +1,16 @@
 name: PR Test and Label Update
 
 on:
-  workflow_dispatch:  # Trigger manually
+  workflow_dispatch:  
   repository_dispatch:
-    types: [trigger-pr-test]  # Triggered by an external event
+    types: [trigger-pr-test]
   push:
     branches:
-      - '**'  # Runs on all branches
+      - '**'
+  workflow_run:
+    workflows: ["Trigger PR Test and Label Update"]
+    types:
+      - completed
 
 jobs:
   run_pytest:
@@ -67,6 +71,7 @@ jobs:
             echo "❌ Tests failed! Setting label to 'tests-failed'"
             gh pr edit $PR_NUMBER --remove-label tests-passed || true
             gh pr edit $PR_NUMBER --add-label tests-failed
+            # Check if PR is open and move to draft
             PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url')
             if [ -n "$PR_URL" ]; then
               echo "🔄 Moving PR back to draft due to failed tests."
