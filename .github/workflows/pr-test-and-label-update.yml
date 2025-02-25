@@ -1,18 +1,18 @@
 name: PR Test and Label Update
 
 on:
-  workflow_dispatch:  # Allows the workflow to be triggered manually
+  workflow_dispatch:  
   repository_dispatch:
     types: [trigger-pr-test]
   push:
     branches:
-      - '**'  # Runs on all branches
+      - '**'
 
 jobs:
   run_pytest:
     runs-on: ubuntu-latest
     outputs:
-      result: ${{ steps.pytest.outcome }}  # Saving test result for the label update
+      result: ${{ steps.pytest.outcome }}
 
     steps:
       - name: Checkout repository
@@ -30,14 +30,15 @@ jobs:
 
       - name: Run pytest
         id: pytest
+        continue-on-error: true
         run: |
-          pytest test_script.py  # No `continue-on-error: true` to make pytest result visible in PR checks
+          pytest test_script.py
         shell: bash
 
   update_label:
     needs: run_pytest
     runs-on: ubuntu-latest
-    if: always()  # Run regardless of pytest result
+    if: always()
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -49,24 +50,21 @@ jobs:
         id: get_pr
         run: echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
 
-      - name: Get current labels
-        id: get_labels
-        run: |
-          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name')
-          echo "Current labels: $LABELS"
-          echo "LABELS=$LABELS" >> $GITHUB_ENV
-
-      - name: Update PR Label and Set Draft if Tests Fail
+      - name: Create PR check status
         run: |
           if [ "${{ needs.run_pytest.outputs.result }}" == "success" ]; then
             echo "✅ Tests passed! Setting label to 'tests-passed'"
             gh pr edit $PR_NUMBER --remove-label tests-failed || true
             gh pr edit $PR_NUMBER --add-label tests-passed
+            # Create a status check
+            gh pr status --set "tests-passed"
           else
             echo "❌ Tests failed! Setting label to 'tests-failed'"
             gh pr edit $PR_NUMBER --remove-label tests-passed || true
             gh pr edit $PR_NUMBER --add-label tests-failed
-            # Check if PR is open, and move it to draft if needed
+            # Create a status check
+            gh pr status --set "tests-failed"
+            # Check if PR is open and move to draft
             PR_URL=$(gh pr list --head "${{ github.ref_name }}" --state open --json url -q '.[0].url')
             if [ -n "$PR_URL" ]; then
               echo "🔄 Moving PR back to draft due to failed tests."
