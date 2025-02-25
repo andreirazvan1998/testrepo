@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Set GH_TOKEN environment variable
+        run: echo "GH_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+
       - name: Debug - Check if the necessary variables are set
         run: |
           echo "GITHUB_TOKEN is set: ${{ secrets.GITHUB_TOKEN != '' }}"
