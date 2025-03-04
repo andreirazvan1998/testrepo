@@ -47,6 +47,7 @@ jobs:
             echo "test_status=test-pass" >> $GITHUB_ENV
           else
             echo "test_status=test-failed" >> $GITHUB_ENV
+          fi
 
       - name: Trigger controlrepo workflow
         run: |
