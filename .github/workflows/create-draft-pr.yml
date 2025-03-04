@@ -35,7 +35,8 @@ jobs:
         id: create_pr
         if: env.PR_EXISTS == 'false'
         run: |
-          PR_NUMBER=$(gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft --json number -q '.number')
+          PR_OUTPUT=$(gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft)
+          PR_NUMBER=$(echo "$PR_OUTPUT" | grep -oP '(?<=#)\d+')
           echo "PR created with number: $PR_NUMBER"
           echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
         env:
