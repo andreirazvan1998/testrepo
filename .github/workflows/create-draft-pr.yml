@@ -35,6 +35,22 @@ jobs:
         id: create_pr
         if: env.PR_EXISTS == 'false'
         run: |
-          gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft
+          PR_NUMBER=$(gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft --json number -q '.number')
+          echo "PR created with number: $PR_NUMBER"
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+
+      - name: Trigger controlrepo workflow
+        if: env.PR_EXISTS == 'false'
+        run: |
+          curl -X POST -H "Accept: application/vnd.github.v3+json" \
+          -H "Authorization: token ${{ secrets.CONTROLREPO_ACCESS_TOKEN }}" \
+          https://api.github.com/repos/andreirazvan1998/controlrepo/dispatches \
+          -d '{
+            "event_type": "update-pr-status",
+            "client_payload": {
+              "pr_name": "PR-${{ env.PR_NUMBER }}",
+              "test_status": "draft"
+            }
+          }'
