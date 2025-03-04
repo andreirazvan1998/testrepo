@@ -50,7 +50,8 @@ jobs:
           -d '{
             "event_type": "update-pr-status",
             "client_payload": {
+              "action": "push",
               "pr_name": "PR-${{ env.PR_NUMBER }}",
-              "test_status": "draft"
+              "test_status": "pending"
             }
           }'
