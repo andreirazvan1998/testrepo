@@ -37,8 +37,8 @@ jobs:
         run: |
           PR_OUTPUT=$(gh pr create -B main -H ${{ github.ref_name }} --title 'Merge ${{ github.ref_name }} into main' --body 'Created by GitHub action' --draft)
           echo "PR created: $PR_OUTPUT"
-          # Extract PR number from the output
-          PR_NUMBER=$(echo "$PR_OUTPUT" | grep -oP '#\K\d+')
+          # Extract PR number from the URL
+          PR_NUMBER=$(echo "$PR_OUTPUT" | sed -n 's/.*pull\/\([0-9]*\)/\1/p')
           echo "PR created with number: $PR_NUMBER"
           echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
         env:
