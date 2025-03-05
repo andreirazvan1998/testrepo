@@ -46,6 +46,8 @@ jobs:
             echo "❌ No PR number found."
             exit 1
           fi
+        env:
+          GH_TOKEN: ${{ github.token }}  # Add this line to authenticate the GitHub CLI
 
       - name: Run pytest
         id: pytest
