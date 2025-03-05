@@ -16,11 +16,23 @@ jobs:
       - name: Set GH_TOKEN environment variable
         run: echo "GH_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
 
+      - name: Get Pull Request Number
+        id: pr
+        run: |
+          PR_NUMBER=$(gh pr view --json number -q .number || echo "")
+          if [ -z "$PR_NUMBER" ]; then
+            echo "❌ No PR number found."
+            exit 1
+          else
+            echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_ENV
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Get PR test result from control repo
         id: get_test_result
         run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          echo "Fetching test result for PR-${PR_NUMBER}..."
+          echo "Fetching test result for PR-${{ env.PR_NUMBER }}..."
 
           # Make an initial request to the control repo to get the test status
           RESPONSE=$(curl -s -X POST \
@@ -31,7 +43,7 @@ jobs:
                   "event_type": "update-pr-status",
                   "client_payload": {
                     "action": "get",
-                    "pr_name": "PR-${PR_NUMBER}"
+                    "pr_name": "PR-${{ env.PR_NUMBER }}"
                   }
                 }')
 
@@ -57,7 +69,7 @@ jobs:
                     "event_type": "update-pr-status",
                     "client_payload": {
                       "action": "get",
-                      "pr_name": "PR-${PR_NUMBER}"
+                      "pr_name": "PR-${{ env.PR_NUMBER }}"
                     }
                   }')
           done
@@ -66,7 +78,7 @@ jobs:
             echo "❌ No test result received after $MAX_RETRIES retries."
             exit 1
           else
-            echo "Test result for PR-${PR_NUMBER}: $TEST_RESULT"
+            echo "Test result for PR-${{ env.PR_NUMBER }}: $TEST_RESULT"
             echo "test_status=${TEST_RESULT}" >> $GITHUB_ENV
           fi
 
