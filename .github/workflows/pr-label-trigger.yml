@@ -41,12 +41,20 @@ jobs:
           RESULT=$(curl -s -H "Authorization: token ${{ secrets.CONTROLREPO_ACCESS_TOKEN }}" \
             "https://api.github.com/repos/andreirazvan1998/controlrepo/contents/pr_status.json?ref=master")  # Change `main` to the correct branch
 
-          # Extract the base64 encoded content
+          # Print the full raw response for debugging
+          echo "Raw API response: $RESPONSE"
+          
+          # Extract the base64 encoded content from the response
           BASE64_CONTENT=$(echo "$RESPONSE" | jq -r '.content')
           
-          # Decode the content and print it
+          # Remove any newline characters from the base64 string (if any)
+          BASE64_CONTENT=$(echo "$BASE64_CONTENT" | tr -d '\n')
+          
+          # Decode the base64 content
           DECODED_CONTENT=$(echo "$BASE64_CONTENT" | base64 --decode)
-          echo "decoded stuff $DECODED_CONTENT"
+          
+          # Display decoded content and save it in the environment variable
+          echo "Decoded content for PR ${PR_NUMBER}: $DECODED_CONTENT"
           echo "test_result=${DECODED_CONTENT}" >> $GITHUB_ENV
 
       - name: Check if the PR needs to be moved to draft
