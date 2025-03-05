@@ -47,8 +47,7 @@ jobs:
           elif [ "${{ github.event_name }}" == "repository_dispatch" ]; then
             echo "PR_NUMBER=${{ github.event.client_payload.pr_number }}" >> $GITHUB_ENV
           elif [ "${{ github.event_name }}" == "push" ]; then
-            PR_NUMBER=$(gh pr list --head "${{ github.ref_name }}" --state open --json number --jq '.[0].number')
-            echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
+            echo "PR_NUMBER=No PR (push event)" >> $GITHUB_ENV
           else
             echo "❌ No PR number found."
             exit 1
