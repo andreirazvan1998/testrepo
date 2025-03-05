@@ -1,6 +1,6 @@
-name: PR Test and Trigger JSON Manager
-
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]  # Runs on PR open/update
   workflow_dispatch:
   repository_dispatch:
     types: [trigger-pr-test]
@@ -40,6 +40,9 @@ jobs:
     if: always()  # Always run, even if tests fail
 
     steps:
+      - name: Set PR Number
+        run: echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+
       - name: Set test status variable
         id: set_test_status
         run: |
