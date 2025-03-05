@@ -13,13 +13,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3  # Use the latest stable version of actions/checkout
 
+      - name: Set GH_TOKEN environment variable
+        run: echo "GH_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+
       - name: Get Pull Request Number
         id: pr
         run: |
-          PR_NUMBER=$(gh pr view --json number -q .number || echo '')
-          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
+          PR_NUMBER=$(gh pr view --json number -q .number || echo "")
+          if [ -z "$PR_NUMBER" ]; then
+            echo "❌ No PR number found."
+            exit 1
+          else
+            echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_ENV
+          fi
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get PR test result from control repo
         id: get_test_result
