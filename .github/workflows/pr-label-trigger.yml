@@ -58,6 +58,7 @@ jobs:
           # Output decoded content and store it in the environment variable
           echo "Decoded content for PR ${PR_NUMBER}: $DECODED_CONTENT"
           echo "test_result=${DECODED_CONTENT}" >> $GITHUB_ENV
+      # Step 2: Check if the PR needs to be moved to draft based on the test result
       - name: Check if the PR needs to be moved to draft
         run: |
           if [ "${{ env.test_result }}" == "test-failed" ]; then
@@ -65,30 +66,45 @@ jobs:
             gh pr ready --undo ${{ env.PR_NUMBER }}
           else
             echo "✅ Test passed, Proceeding with E2E tests."
-            pytest e2etests.py
+            # Trigger E2E tests in a new stage
+            echo "test_triggered=true" >> $GITHUB_ENV
           fi
 
-        # Step 3: Handle the results of E2E tests and notify reviewers
+      # Step 3: Trigger E2E tests
+      - name: Trigger E2E Tests
+        if: env.test_triggered == 'true'
+        run: |
+          echo "Running E2E tests..."
+          pytest e2etests.py
+          if [ $? -eq 0 ]; then
+            echo "✅ E2E tests passed."
+            echo "e2e_test_result=passed" >> $GITHUB_ENV
+          else
+            echo "❌ E2E tests failed."
+            echo "e2e_test_result=failed" >> $GITHUB_ENV
+          fi
+
+      # Step 4: Handle E2E test results and Notify Reviewers
       - name: Handle E2E test results and Notify Reviewers
-        if: success()
+        if: env.e2e_test_result == 'passed'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ $? -eq 0 ]; then
-            echo "✅ E2E tests passed. Notifying reviewers."
-            PR_URL=$(gh pr list --head ${{ github.head_ref }} --state open --json url -q '.[0].url')
-            echo "PR URL: $PR_URL"
-            
-            # Check if PR_URL is set
-            if [ -z "$PR_URL" ]; then
-              echo "❌ No open PR found for the current branch."
-              exit 1
-            fi
-
-            # Add the reviewer to the PR
-            echo "Tests passed, adding reviewer."
-            gh pr edit "$PR_URL" --add-reviewer andreirazvan1998
-          else
-            echo "❌ E2E tests failed, moving PR to draft."
-            gh pr ready --undo ${{ env.PR_NUMBER }}
+          PR_URL=$(gh pr list --head ${{ github.head_ref }} --state open --json url -q '.[0].url')
+          echo "PR URL: $PR_URL"
+          
+          # Check if PR_URL is set
+          if [ -z "$PR_URL" ]; then
+            echo "❌ No open PR found for the current branch."
+            exit 1
           fi
+
+          # Add the reviewer to the PR
+          echo "Tests passed, adding reviewer."
+          gh pr edit "$PR_URL" --add-reviewer andreirazvan1998
+
+      - name: Move PR to Draft (if E2E tests failed)
+        if: env.e2e_test_result == 'failed'
+        run: |
+          echo "❌ E2E tests failed, moving PR to draft."
+          gh pr ready --undo ${{ env.PR_NUMBER }}
