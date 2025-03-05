@@ -38,7 +38,7 @@ jobs:
         id: get_test_result
         run: |
           PR_NUMBER="PR-${{ env.PR_NUMBER }}"
-          RESULT=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          RESULT=$(curl -s -H "Authorization: token ${{ secrets.CONTROLREPO_ACCESS_TOKEN }}" \
             "https://api.github.com/repos/andreirazvan1998/controlrepo/contents/pr_status.json?ref=master")  # Change `main` to the correct branch
 
           if [[ $(echo "$RESULT" | jq -r '.message') == "Not Found" ]]; then
