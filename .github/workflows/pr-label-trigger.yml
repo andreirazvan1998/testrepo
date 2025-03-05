@@ -41,23 +41,14 @@ jobs:
           RESULT=$(curl -s -H "Authorization: token ${{ secrets.CONTROLREPO_ACCESS_TOKEN }}" \
             "https://api.github.com/repos/andreirazvan1998/controlrepo/contents/pr_status.json?ref=master")  # Change `main` to the correct branch
 
-          if [[ $(echo "$RESULT" | jq -r '.message') == "Not Found" ]]; then
-            echo "❌ pr_status.json file not found. Please check the file path and branch."
-            exit 1
-          fi
-
-          # Extract the content of pr_status.json without base64 decoding (assuming it's already a readable string)
-          CONTENT=$(echo "$RESULT" | jq -r '.content')
-
-          # Check if the content is base64 encoded. If it's base64, decode it; otherwise, skip decoding.
-          if [[ "$CONTENT" =~ ^[A-Za-z0-9+/=]+$ ]]; then
-            # Decode the base64 content
-            CONTENT=$(echo "$CONTENT" | base64 --decode)
-          fi
-
-          # Print the content and store it in the environment variable
-          echo "Test result: $CONTENT"
-          echo "test_result=${CONTENT}" >> $GITHUB_ENV
+          # Extract the base64 encoded content
+          BASE64_CONTENT=$(echo "$RESPONSE" | jq -r '.content')
+          
+          # Decode the content and print it
+          DECODED_CONTENT=$(echo "$BASE64_CONTENT" | base64 --decode)
+          echo "Test result for PR ${PR_NUMBER}:"
+          echo "$DECODED_CONTENT"
+          echo "test_result=${DECODED_CONTENT}" >> $GITHUB_ENV
 
       - name: Check if the PR needs to be moved to draft
         run: |
