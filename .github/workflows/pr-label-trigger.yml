@@ -58,18 +58,27 @@ jobs:
           # Output decoded content and store it in the environment variable
           echo "Decoded content for PR ${PR_NUMBER}: $DECODED_CONTENT"
           echo "test_result=${DECODED_CONTENT}" >> $GITHUB_ENV
-      - name: Check if the PR needs to be moved to draft
+      # Step 3: Handle the results of E2E tests and notify reviewers
+      - name: Handle E2E test results and Notify Reviewers
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ "${{ env.test_result }}" == "test-failed" ]; then
-            echo "❌ Test failed, moving PR to draft."
-            gh pr ready --undo ${{ env.PR_NUMBER }}
-          else
-            echo "✅ Test passed, no action needed."
-          fi
+          if [ $? -eq 0 ]; then
+            echo "✅ E2E tests passed. Notifying reviewers."
+            PR_URL=$(gh pr list --head ${{ github.head_ref }} --state open --json url -q '.[0].url')
+            echo "PR URL: $PR_URL"
+            
+            # Check if PR_URL is set
+            if [ -z "$PR_URL" ]; then
+              echo "❌ No open PR found for the current branch."
+              exit 1
+            fi
 
-      - name: Handle PR status based on test result
-        run: |
-          if [ "${{ env.test_result }}" == "fail" ]; then
-            echo "The PR has failed tests and was moved to draft."
+            # Add the reviewer to the PR
+            echo "Tests passed, adding reviewer."
+            gh pr edit "$PR_URL" --add-reviewer andreirazvan1998
           else
-            echo "The PR passed the tests or no failure was detected."
+            echo "❌ E2E tests failed, moving PR to draft."
+            gh pr ready --undo ${{ env.PR_NUMBER }}
+          fi
