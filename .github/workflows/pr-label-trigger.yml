@@ -46,13 +46,18 @@ jobs:
             exit 1
           fi
 
-          # Extract the content of pr_status.json without base64 decoding (assuming it's already a readable string)
-          CONTENT=$(echo "$RESULT" | jq -r '.content')
+          # Extract the base64 encoded content from the response
+          BASE64_CONTENT=$(echo "$RESULT" | jq -r '.content')
 
-          # Print the content and store it in the environment variable
-          echo "Test result: $CONTENT"
-          echo "test_result=${CONTENT}" >> $GITHUB_ENV
+          # Remove any newline characters from the base64 string (if any)
+          BASE64_CONTENT=$(echo "$BASE64_CONTENT" | tr -d '\n')
 
+          # Call the Python script to decode the base64 content and get the test result
+          DECODED_CONTENT=$(python3 decode_base64.py "${PR_NUMBER}" "${BASE64_CONTENT}")
+
+          # Output decoded content and store it in the environment variable
+          echo "Decoded content for PR ${PR_NUMBER}: $DECODED_CONTENT"
+          echo "test_result=${DECODED_CONTENT}" >> $GITHUB_ENV
       - name: Check if the PR needs to be moved to draft
         run: |
           if [ "${{ env.test_result }}" == "fail" ]; then
