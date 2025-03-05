@@ -16,26 +16,65 @@ jobs:
       - name: Set GH_TOKEN environment variable
         run: echo "GH_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
 
-      - name: Check if the PR is labeled 'tests-failed'
-        id: check_labels
+      - name: Get PR test result from control repo
+        id: get_test_result
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
-          LABELS=$(gh pr view $PR_NUMBER --json labels -q '.labels[].name')
-          echo "Current labels: $LABELS"
-          if echo "$LABELS" | grep -q "tests-failed"; then
-            echo "✅ 'tests-failed' label found, putting the PR back to draft."
-            echo "move_to_draft=true" >> $GITHUB_ENV
-            # Put the PR back to draft if 'tests-failed' label is present
-            gh pr ready --undo $PR_NUMBER
+          echo "Fetching test result for PR-${PR_NUMBER}..."
+
+          # Make an initial request to the control repo to get the test status
+          RESPONSE=$(curl -s -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.CONTROLREPO_ACCESS_TOKEN }}" \
+            https://api.github.com/repos/andreirazvan1998/controlrepo/dispatches \
+            -d '{
+                  "event_type": "update-pr-status",
+                  "client_payload": {
+                    "action": "get",
+                    "pr_name": "PR-${PR_NUMBER}"
+                  }
+                }')
+
+          # Retry mechanism (polling) for a response from the control repo API
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          TEST_RESULT=""
+          while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
+            TEST_RESULT=$(echo $RESPONSE | jq -r '.client_payload.test_status')
+
+            if [ "$TEST_RESULT" != "null" ]; then
+              break
+            fi
+
+            RETRY_COUNT=$((RETRY_COUNT+1))
+            echo "Waiting for test result... Retry #$RETRY_COUNT"
+            sleep 5  # Wait 5 seconds before retrying
+            RESPONSE=$(curl -s -X POST \
+              -H "Accept: application/vnd.github.v3+json" \
+              -H "Authorization: token ${{ secrets.CONTROLREPO_ACCESS_TOKEN }}" \
+              https://api.github.com/repos/andreirazvan1998/controlrepo/dispatches \
+              -d '{
+                    "event_type": "update-pr-status",
+                    "client_payload": {
+                      "action": "get",
+                      "pr_name": "PR-${PR_NUMBER}"
+                    }
+                  }')
+          done
+
+          if [ "$TEST_RESULT" == "null" ]; then
+            echo "❌ No test result received after $MAX_RETRIES retries."
+            exit 1
           else
-            echo "❌ 'tests-failed' label not found, no action needed."
-            echo "move_to_draft=false" >> $GITHUB_ENV
+            echo "Test result for PR-${PR_NUMBER}: $TEST_RESULT"
+            echo "test_status=${TEST_RESULT}" >> $GITHUB_ENV
           fi
 
-      - name: Handle PR status based on label
+      - name: Handle PR status based on test result
         run: |
-          if [ "${{ env.move_to_draft }}" == "true" ]; then
-            echo "The PR was moved to draft due to the 'tests-failed' label."
+          if [ "${{ env.test_status }}" == "test-failed" ]; then
+            echo "✅ 'test-failed' found, putting the PR back to draft."
+            gh pr ready --undo ${{ github.event.pull_request.number }}
           else
-            echo "No action was required as the PR does not have the 'tests-failed' label."
+            echo "❌ 'test-failed' not found, no action needed."
           fi
