@@ -1,6 +1,6 @@
 on:
   pull_request:
-    types: [opened, synchronize, reopened]  # Runs on PR open/update
+    types: [opened,reopened]  # Runs on PR open/update
   workflow_dispatch:
   repository_dispatch:
     types: [trigger-pr-test]
