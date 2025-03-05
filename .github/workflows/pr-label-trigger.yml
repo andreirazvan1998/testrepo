@@ -38,10 +38,16 @@ jobs:
         id: get_test_result
         run: |
           PR_NUMBER="PR-${{ env.PR_NUMBER }}"
+          # Fetch the pr_status.json from the controlrepo using curl
           RESULT=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/andreirazvan1998/controlrepo/pr_status.json)
-          echo "Test result for PR ${PR_NUMBER}: $RESULT"
-          echo "test_result=${RESULT}" >> $GITHUB_ENV
+            "https://api.github.com/repos/andreirazvan1998/controlrepo/contents/pr_status.json?ref=master")  # Change `main` to the correct branch
+
+          # Extract the content of pr_status.json
+          CONTENT=$(echo "$RESULT" | jq -r '.content' | base64 --decode)
+
+          # Print the content and store it in the environment variable
+          echo "Test result: $CONTENT"
+          echo "test_result=${CONTENT}" >> $GITHUB_ENV
 
       - name: Check if the PR needs to be moved to draft
         run: |
