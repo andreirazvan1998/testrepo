@@ -60,11 +60,11 @@ jobs:
           echo "test_result=${DECODED_CONTENT}" >> $GITHUB_ENV
       - name: Check if the PR needs to be moved to draft
         run: |
-          if [ "${{ env.test_result }}" == "fail" ]; then
+          if [ "${{ env.test_result }}" == "test-failed" ]; then
             echo "✅ Test failed, moving PR to draft."
             gh pr ready --undo ${{ env.PR_NUMBER }}
           else
-            echo "❌ Test passed or no result, no action needed."
+            echo "❌ Test passed, no action needed."
           fi
 
       - name: Handle PR status based on test result
