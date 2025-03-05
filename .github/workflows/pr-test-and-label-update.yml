@@ -52,8 +52,6 @@ jobs:
             echo "❌ No PR number found."
             exit 1
           fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set test status variable
         id: set_test_status
