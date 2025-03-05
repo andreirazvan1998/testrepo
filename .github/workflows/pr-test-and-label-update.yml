@@ -28,6 +28,25 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest
 
+      - name: Check if PR exists
+        id: pr_check
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+          elif [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            echo "PR_NUMBER=${{ github.event.client_payload.pr_number }}" >> $GITHUB_ENV
+          elif [ "${{ github.event_name }}" == "push" ]; then
+            PR_NUMBER=$(gh pr list --head "test3" --state open --json number --jq '.[0].number')
+            if [ -z "$PR_NUMBER" ]; then
+              echo "❌ No open PR found for the push event."
+              exit 1
+            fi
+            echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
+          else
+            echo "❌ No PR number found."
+            exit 1
+          fi
+
       - name: Run pytest
         id: pytest
         run: |
@@ -40,19 +59,6 @@ jobs:
     if: always()  # Always run, even if tests fail
 
     steps:
-      - name: Set PR Number (Handle Different Events)
-        run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
-          elif [ "${{ github.event_name }}" == "repository_dispatch" ]; then
-            echo "PR_NUMBER=${{ github.event.client_payload.pr_number }}" >> $GITHUB_ENV
-          elif [ "${{ github.event_name }}" == "push" ]; then
-            echo "PR_NUMBER=No PR (push event)" >> $GITHUB_ENV
-          else
-            echo "❌ No PR number found."
-            exit 1
-          fi
-
       - name: Set test status variable
         id: set_test_status
         run: |
