@@ -58,7 +58,7 @@ jobs:
             "event_type": "update-pr-status",
             "client_payload": {
               "action": "modify",
-              "pr_name": "PR-123",
+              "pr_name": "PR-${{ env.PR_NUMBER }}",
               "test_status": "'"${{ env.test_status }}"'"
             }
           }'
