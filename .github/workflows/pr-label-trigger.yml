@@ -49,12 +49,6 @@ jobs:
           # Extract the content of pr_status.json without base64 decoding (assuming it's already a readable string)
           CONTENT=$(echo "$RESULT" | jq -r '.content')
 
-          # Check if the content is base64 encoded. If it's base64, decode it; otherwise, skip decoding.
-          if [[ "$CONTENT" =~ ^[A-Za-z0-9+/=]+$ ]]; then
-            # Decode the base64 content
-            CONTENT=$(echo "$CONTENT" | base64 --decode)
-          fi
-
           # Print the content and store it in the environment variable
           echo "Test result: $CONTENT"
           echo "test_result=${CONTENT}" >> $GITHUB_ENV
