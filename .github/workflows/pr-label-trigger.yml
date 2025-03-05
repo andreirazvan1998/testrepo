@@ -46,8 +46,7 @@ jobs:
           
           # Decode the content and print it
           DECODED_CONTENT=$(echo "$BASE64_CONTENT" | base64 --decode)
-          echo "Test result for PR ${PR_NUMBER}:"
-          echo "$DECODED_CONTENT"
+          echo "decoded stuff $DECODED_CONTENT"
           echo "test_result=${DECODED_CONTENT}" >> $GITHUB_ENV
 
       - name: Check if the PR needs to be moved to draft
