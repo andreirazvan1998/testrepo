@@ -54,6 +54,8 @@ jobs:
             sudo apt-get update
             sudo apt-get install gh
             gh auth login --with-token < ${{ secrets.GITHUB_TOKEN }}  # Ensure authentication
+            
+            # Get the PR number from the push event
             PR_NUMBER=$(gh pr list --head "test3" --state open --json number --jq '.[0].number')
             if [ -z "$PR_NUMBER" ]; then
               echo "❌ No open PR found for the push event."
@@ -63,6 +65,7 @@ jobs:
           else
             echo "❌ No PR number found."
             exit 1
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Ensure token is set for authentication
 
