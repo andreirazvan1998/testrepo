@@ -45,11 +45,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set PR Number (Handle Different Events)
+      - name: Get Pull Request Number
+        id: pr
+        run: echo "::set-output name=pull_request_number::$(gh pr view --json number -q .number || echo '')"
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number || github.event.client_payload.pr_number || 'No PR (push event)' }}
-        run: |
-          echo "PR_NUMBER=${{ env.PR_NUMBER }}" >> $GITHUB_ENV
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set test status variable
         id: set_test_status
@@ -69,7 +69,7 @@ jobs:
             "event_type": "update-pr-status",
             "client_payload": {
               "action": "modify",
-              "pr_name": "PR-${{ env.PR_NUMBER }}",
+              "pr_name": "PR-${{ steps.pr.outputs.pull_request_number }}",
               "test_status": "'"${{ env.test_status }}"'"
             }
           }'
