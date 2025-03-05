@@ -75,6 +75,7 @@ jobs:
         if: env.test_triggered == 'true'
         run: |
           echo "Running E2E tests..."
+          pip install pytest
           pytest e2etests.py
           if [ $? -eq 0 ]; then
             echo "✅ E2E tests passed."
@@ -83,6 +84,7 @@ jobs:
             echo "❌ E2E tests failed."
             echo "e2e_test_result=failed" >> $GITHUB_ENV
           fi
+
 
       # Step 4: Handle E2E test results and Notify Reviewers
       - name: Handle E2E test results and Notify Reviewers
