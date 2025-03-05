@@ -1,6 +1,6 @@
 on:
   pull_request:
-    types: [opened,reopened]  # Runs on PR open/update
+    types: [opened, reopened]  # Runs only when PR is created or reopened
   workflow_dispatch:
   repository_dispatch:
     types: [trigger-pr-test]
@@ -40,8 +40,21 @@ jobs:
     if: always()  # Always run, even if tests fail
 
     steps:
-      - name: Set PR Number
-        run: echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+      - name: Set PR Number (Handle Different Events)
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+          elif [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            echo "PR_NUMBER=${{ github.event.client_payload.pr_number }}" >> $GITHUB_ENV
+          elif [ "${{ github.event_name }}" == "push" ]; then
+            PR_NUMBER=$(gh pr list --head "${{ github.ref_name }}" --state open --json number --jq '.[0].number')
+            echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
+          else
+            echo "❌ No PR number found."
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set test status variable
         id: set_test_status
@@ -50,6 +63,16 @@ jobs:
             echo "test_status=test-pass" >> $GITHUB_ENV
           else
             echo "test_status=test-failed" >> $GITHUB_ENV
+          fi
+
+      - name: Check if PR is already processed
+        run: |
+          if [ -f "pr_status.json" ]; then
+            PR_EXISTS=$(jq 'has("PR-${{ env.PR_NUMBER }}")' pr_status.json)
+            if [ "$PR_EXISTS" == "true" ]; then
+              echo "⚠️ PR ${PR_NUMBER} already processed. Skipping the update."
+              exit 0
+            fi
           fi
 
       - name: Trigger controlrepo workflow
