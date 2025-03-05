@@ -16,6 +16,11 @@ jobs:
       - name: Set GH_TOKEN environment variable
         run: echo "GH_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
 
+      - name: Checkout the PR branch explicitly
+        run: |
+          git fetch origin ${{ github.head_ref }}  # Fetch the PR branch
+          git checkout ${{ github.head_ref }}  # Checkout the PR branch
+
       - name: Get Pull Request Number
         id: pr
         run: |
