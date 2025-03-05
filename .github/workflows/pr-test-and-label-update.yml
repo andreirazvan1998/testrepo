@@ -28,27 +28,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest
 
-      - name: Check if PR exists
-        id: pr_check
-        run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
-          elif [ "${{ github.event_name }}" == "repository_dispatch" ]; then
-            echo "PR_NUMBER=${{ github.event.client_payload.pr_number }}" >> $GITHUB_ENV
-          elif [ "${{ github.event_name }}" == "push" ]; then
-            PR_NUMBER=$(gh pr list --head "test3" --state open --json number --jq '.[0].number')
-            if [ -z "$PR_NUMBER" ]; then
-              echo "❌ No open PR found for the push event."
-              exit 1
-            fi
-            echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
-          else
-            echo "❌ No PR number found."
-            exit 1
-          fi
-        env:
-          GH_TOKEN: ${{ github.token }}  # Add this line to authenticate the GitHub CLI
-
       - name: Run pytest
         id: pytest
         run: |
@@ -61,6 +40,32 @@ jobs:
     if: always()  # Always run, even if tests fail
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set PR Number (Handle Different Events)
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+          elif [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            echo "PR_NUMBER=${{ github.event.client_payload.pr_number }}" >> $GITHUB_ENV
+          elif [ "${{ github.event_name }}" == "push" ]; then
+            # Ensure gh CLI is installed
+            sudo apt-get update
+            sudo apt-get install gh
+            gh auth login --with-token < ${{ secrets.GITHUB_TOKEN }}  # Ensure authentication
+            PR_NUMBER=$(gh pr list --head "test3" --state open --json number --jq '.[0].number')
+            if [ -z "$PR_NUMBER" ]; then
+              echo "❌ No open PR found for the push event."
+              exit 1
+            fi
+            echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
+          else
+            echo "❌ No PR number found."
+            exit 1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Ensure token is set for authentication
+
       - name: Set test status variable
         id: set_test_status
         run: |
@@ -68,16 +73,6 @@ jobs:
             echo "test_status=test-pass" >> $GITHUB_ENV
           else
             echo "test_status=test-failed" >> $GITHUB_ENV
-          fi
-
-      - name: Check if PR is already processed
-        run: |
-          if [ -f "pr_status.json" ]; then
-            PR_EXISTS=$(jq 'has("PR-${{ env.PR_NUMBER }}")' pr_status.json)
-            if [ "$PR_EXISTS" == "true" ]; then
-              echo "⚠️ PR ${PR_NUMBER} already processed. Skipping the update."
-              exit 0
-            fi
           fi
 
       - name: Trigger controlrepo workflow
