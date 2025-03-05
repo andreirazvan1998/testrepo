@@ -39,7 +39,7 @@ jobs:
         run: |
           PR_NUMBER="PR-${{ env.PR_NUMBER }}"
           RESULT=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/andreirazvan1998/controlrepo/contents/pr_status.json)
+            https://api.github.com/repos/andreirazvan1998/controlrepo/pr_status.json)
           echo "Test result for PR ${PR_NUMBER}: $RESULT"
           echo "test_result=${RESULT}" >> $GITHUB_ENV
 
