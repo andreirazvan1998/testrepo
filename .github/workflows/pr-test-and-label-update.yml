@@ -1,3 +1,15 @@
+name: PR Test and Trigger JSON Manager
+
+on:
+  pull_request:
+    types: [opened, reopened]  # Runs only when PR is created or reopened
+  workflow_dispatch:
+  repository_dispatch:
+    types: [trigger-pr-test]
+  push:
+    branches:
+      - '**'
+
 jobs:
   run_pytest:
     runs-on: ubuntu-latest
