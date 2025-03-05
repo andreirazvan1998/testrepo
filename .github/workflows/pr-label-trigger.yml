@@ -16,82 +16,61 @@ jobs:
       - name: Set GH_TOKEN environment variable
         run: echo "GH_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
 
-      - name: Checkout the PR branch explicitly
-        run: |
-          git fetch origin ${{ github.head_ref }}  # Fetch the PR branch
-          git checkout ${{ github.head_ref }}  # Checkout the PR branch
-
-      - name: Get Pull Request Number
+      - name: Get PR number
         id: pr
         run: |
           PR_NUMBER=$(gh pr view --json number -q .number || echo "")
-          if [ -z "$PR_NUMBER" ]; then
-            echo "❌ No PR number found."
-            exit 1
-          else
-            echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_ENV
-          fi
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get PR test result from control repo
-        id: get_test_result
+      - name: Trigger Python script in controlrepo
+        id: trigger_controlrepo
         run: |
-          echo "Fetching test result for PR-${{ env.PR_NUMBER }}..."
+          curl -X POST -H "Accept: application/vnd.github.v3+json" \
+          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          https://api.github.com/repos/andreirazvan1998/controlrepo/dispatches \
+          -d '{
+            "event_type": "update-pr-status",
+            "client_payload": {
+              "pr_number": "${{ env.PR_NUMBER }}",
+              "flag": "get"
+            }
+          }'
 
-          # Make an initial request to the control repo to get the test status
-          RESPONSE=$(curl -s -X POST \
-            -H "Accept: application/vnd.github.v3+json" \
-            -H "Authorization: token ${{ secrets.CONTROLREPO_ACCESS_TOKEN }}" \
-            https://api.github.com/repos/andreirazvan1998/controlrepo/dispatches \
-            -d '{
-                  "event_type": "update-pr-status",
-                  "client_payload": {
-                    "action": "get",
-                    "pr_name": "PR-${{ env.PR_NUMBER }}"
-                  }
-                }')
+      - name: Wait for result from controlrepo (Fetch pr_status.json)
+        id: get_result
+        run: |
+          # Wait for the response from the Python script in controlrepo
+          # Here, we fetch the pr_status.json file and extract the result
+          
+          curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          -O "https://raw.githubusercontent.com/andreirazvan1998/controlrepo/master/pr_status.json"
 
-          # Retry mechanism (polling) for a response from the control repo API
-          MAX_RETRIES=5
-          RETRY_COUNT=0
-          TEST_RESULT=""
-          while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
-            TEST_RESULT=$(echo $RESPONSE | jq -r '.client_payload.test_status')
+          # Extract the result from pr_status.json for the PR number
+          PR_RESULT=$(jq -r ".\"${{ env.PR_NUMBER }}\".status" pr_status.json)
 
-            if [ "$TEST_RESULT" != "null" ]; then
-              break
-            fi
-
-            RETRY_COUNT=$((RETRY_COUNT+1))
-            echo "Waiting for test result... Retry #$RETRY_COUNT"
-            sleep 5  # Wait 5 seconds before retrying
-            RESPONSE=$(curl -s -X POST \
-              -H "Accept: application/vnd.github.v3+json" \
-              -H "Authorization: token ${{ secrets.CONTROLREPO_ACCESS_TOKEN }}" \
-              https://api.github.com/repos/andreirazvan1998/controlrepo/dispatches \
-              -d '{
-                    "event_type": "update-pr-status",
-                    "client_payload": {
-                      "action": "get",
-                      "pr_name": "PR-${{ env.PR_NUMBER }}"
-                    }
-                  }')
-          done
-
-          if [ "$TEST_RESULT" == "null" ]; then
-            echo "❌ No test result received after $MAX_RETRIES retries."
-            exit 1
+          echo "Test result: $PR_RESULT"
+          
+          if [[ "$PR_RESULT" == "pass" ]]; then
+            echo "Test passed!"
+            echo "test_status=pass" >> $GITHUB_ENV
+          elif [[ "$PR_RESULT" == "fail" ]]; then
+            echo "Test failed!"
+            echo "test_status=fail" >> $GITHUB_ENV
           else
-            echo "Test result for PR-${{ env.PR_NUMBER }}: $TEST_RESULT"
-            echo "test_status=${TEST_RESULT}" >> $GITHUB_ENV
+            echo "Test result not available or error occurred."
+            echo "test_status=error" >> $GITHUB_ENV
           fi
 
       - name: Handle PR status based on test result
         run: |
-          if [ "${{ env.test_status }}" == "test-failed" ]; then
-            echo "✅ 'test-failed' found, putting the PR back to draft."
-            gh pr ready --undo ${{ github.event.pull_request.number }}
+          if [ "${{ env.test_status }}" == "fail" ]; then
+            echo "Tests failed. Moving PR to draft."
+            gh pr ready --undo ${{ env.PR_NUMBER }}
+          elif [ "${{ env.test_status }}" == "pass" ]; then
+            echo "Tests passed. No action needed."
           else
-            echo "❌ 'test-failed' not found, no action needed."
+            echo "Unknown test result. No action taken."
           fi
