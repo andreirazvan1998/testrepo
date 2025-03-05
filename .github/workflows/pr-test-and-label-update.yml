@@ -47,7 +47,9 @@ jobs:
 
       - name: Get Pull Request Number
         id: pr
-        run: echo "::set-output name=pull_request_number::$(gh pr view --json number -q .number || echo '')"
+        run: |
+          PR_NUMBER=$(gh pr view --json number -q .number || echo '')
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -69,7 +71,7 @@ jobs:
             "event_type": "update-pr-status",
             "client_payload": {
               "action": "modify",
-              "pr_name": "PR-${{ steps.pr.outputs.pull_request_number }}",
+              "pr_name": "PR-${{ env.PR_NUMBER }}",
               "test_status": "'"${{ env.test_status }}"'"
             }
           }'
