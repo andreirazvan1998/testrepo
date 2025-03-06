@@ -13,6 +13,20 @@ jobs:
   delete_branch:
     runs-on: ubuntu-latest
     steps:
+      
+      - name: Get Pull Request Number
+        id: pr
+        run: |
+          PR_NUMBER=$(gh pr view --json number -q .number || echo "")
+          if [ -z "$PR_NUMBER" ]; then
+            echo "❌ No PR number found."
+            exit 1
+          else
+            echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_ENV
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Delete Branch After Merge
         if: github.event.pull_request.merged == true  # Only delete if PR was merged
         run: |
@@ -21,3 +35,18 @@ jobs:
           gh api -X DELETE repos/${{ github.repository }}/git/refs/heads/$BRANCH_NAME
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Call Control Repo to Delete PR Entry
+        if: github.event.pull_request.merged == true  # Only trigger on merge
+        env:
+          GH_TOKEN: ${{ secrets.CONTROLREPO_ACCESS_TOKEN }}  
+        run: |
+          PR_NUMBER="PR-${{ github.event.pull_request.number }}"
+          echo "Deleting PR entry: $PR_NUMBER from controlrepo"
+
+          RESPONSE=$(curl -s -X POST -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -d '{"operation": "delete", "pr_number": "'"$PR_NUMBER"'"}' \
+            "https://api.github.com/repos/andreirazvan1998/controlrepo/dispatches")
+
+          echo "Response: $RESPONSE"
