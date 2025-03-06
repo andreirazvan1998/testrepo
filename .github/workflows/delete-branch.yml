@@ -13,7 +13,9 @@ jobs:
   delete_branch:
     runs-on: ubuntu-latest
     steps:
-      
+      - name: Checkout repository
+        uses: actions/checkout@v4  # ✅ This ensures the repo is available for Git commands
+
       - name: Checkout the PR branch explicitly
         run: |
           git fetch origin ${{ github.head_ref }}  # Fetch the PR branch
@@ -48,10 +50,8 @@ jobs:
         run: |
           PR_NUMBER="PR-${{ github.event.pull_request.number }}"
           echo "Deleting PR entry: $PR_NUMBER from controlrepo"
-
           RESPONSE=$(curl -s -X POST -H "Authorization: token $GH_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             -d '{"operation": "delete", "pr_number": "'"$PR_NUMBER"'"}' \
             "https://api.github.com/repos/andreirazvan1998/controlrepo/dispatches")
-
           echo "Response: $RESPONSE"
