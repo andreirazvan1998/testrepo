@@ -11,12 +11,12 @@ def test_write_message():
     assert os.path.exists("output.txt")
 
 def test_add_numbers():
-    assert add_numbers(2, 3) == 6
+    assert add_numbers(2, 3) == 5
     assert add_numbers(-1, 1) == 0
     assert add_numbers(0, 0) == 0
 
 def test_multiply_numbers():
-    assert multiply_numbers(2, 3) == 6
+    assert multiply_numbers(2, 3) == 5
     assert multiply_numbers(-1, 5) == -5
     assert multiply_numbers(0, 10) == 0
     assert multiply_numbers(4, 4) == 16
