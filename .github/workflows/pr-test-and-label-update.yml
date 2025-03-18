@@ -1,0 +1,77 @@
+name: PR Test and Trigger JSON Manager
+
+on:
+  pull_request:
+    types: [opened, reopened]  # Runs only when PR is created or reopened
+  workflow_dispatch:
+  repository_dispatch:
+    types: [trigger-pr-test]
+  push:
+    branches:
+      - '**'
+
+jobs:
+  run_pytest:
+    runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.pytest.outcome }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Run pytest
+        id: pytest
+        run: |
+          pytest test_script.py
+        shell: bash
+
+  trigger_controlrepo:
+    needs: run_pytest
+    runs-on: ubuntu-latest
+    if: always()  # Always run, even if tests fail
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Get Pull Request Number
+        id: pr
+        run: |
+          PR_NUMBER=$(gh pr view --json number -q .number || echo '')
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set test status variable
+        id: set_test_status
+        run: |
+          if [ "${{ needs.run_pytest.outputs.result }}" == "success" ]; then
+            echo "test_status=test-pass" >> $GITHUB_ENV
+          else
+            echo "test_status=test-failed" >> $GITHUB_ENV
+          fi
+
+      - name: Trigger controlrepo workflow
+        run: |
+          curl -X POST -H "Accept: application/vnd.github.v3+json" \
+          -H "Authorization: token ${{ secrets.CONTROLREPO_ACCESS_TOKEN }}" \
+          https://api.github.com/repos/andreirazvan1998/controlrepo/dispatches \
+          -d '{
+            "event_type": "update-pr-status",
+            "client_payload": {
+              "action": "modify",
+              "pr_name": "PR-${{ env.PR_NUMBER }}",
+              "test_status": "'"${{ env.test_status }}"'"
+            }
+          }'

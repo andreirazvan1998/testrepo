@@ -13,11 +13,48 @@ jobs:
   delete_branch:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4  # ✅ This ensures the repo is available for Git commands
+
+      - name: Set GH_TOKEN environment variable
+        run: echo "GH_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+      
+      - name: Checkout the PR branch explicitly
+        run: |
+          git fetch origin ${{ github.head_ref }}  # Fetch the PR branch
+          git checkout ${{ github.head_ref }}  # Checkout the PR branch
+
+      - name: Get Pull Request Number
+        id: pr
+        run: |
+          PR_NUMBER=$(gh pr view --json number -q .number || echo "")
+          if [ -z "$PR_NUMBER" ]; then
+            echo "❌ No PR number found."
+            exit 1
+          else
+            echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_ENV
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Delete Branch After Merge
-        if: github.event.pull_request.merged == true  # Only delete if PR was merged
         run: |
           BRANCH_NAME=${{ github.event.pull_request.head.ref }}
           echo "Deleting branch $BRANCH_NAME"
           gh api -X DELETE repos/${{ github.repository }}/git/refs/heads/$BRANCH_NAME
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Trigger controlrepo workflow
+        run: |
+          curl -X POST -H "Accept: application/vnd.github.v3+json" \
+          -H "Authorization: token ${{ secrets.CONTROLREPO_ACCESS_TOKEN }}" \
+          https://api.github.com/repos/andreirazvan1998/controlrepo/dispatches \
+          -d '{
+            "event_type": "update-pr-status",
+            "client_payload": {
+              "action": "delete",
+              "pr_name": "PR-${{ env.PR_NUMBER }}"
+            }
+          }'
+

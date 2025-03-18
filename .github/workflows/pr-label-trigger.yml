@@ -1,0 +1,112 @@
+name: Trigger PR Test and Label Update
+
+on:
+  pull_request:
+    types:
+      - ready_for_review  # Triggered when PR is moved from Draft to Open
+
+jobs:
+  handle_labels:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3  # Use the latest stable version of actions/checkout
+
+      - name: Set GH_TOKEN environment variable
+        run: echo "GH_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+
+      - name: Checkout the PR branch explicitly
+        run: |
+          git fetch origin ${{ github.head_ref }}  # Fetch the PR branch
+          git checkout ${{ github.head_ref }}  # Checkout the PR branch
+
+      - name: Get Pull Request Number
+        id: pr
+        run: |
+          PR_NUMBER=$(gh pr view --json number -q .number || echo "")
+          if [ -z "$PR_NUMBER" ]; then
+            echo "❌ No PR number found."
+            exit 1
+          else
+            echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_ENV
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Python Script to Get Test Result
+        id: get_test_result
+        run: |
+          PR_NUMBER="PR-${{ env.PR_NUMBER }}"
+          RESULT=$(curl -s -H "Authorization: token ${{ secrets.CONTROLREPO_ACCESS_TOKEN }}" \
+            "https://api.github.com/repos/andreirazvan1998/controlrepo/contents/pr_status.json?ref=master")  # Change `main` to the correct branch
+
+          if [[ $(echo "$RESULT" | jq -r '.message') == "Not Found" ]]; then
+            echo "❌ pr_status.json file not found. Please check the file path and branch."
+            exit 1
+          fi
+
+          # Extract the base64 encoded content from the response
+          BASE64_CONTENT=$(echo "$RESULT" | jq -r '.content')
+
+          # Remove any newline characters from the base64 string (if any)
+          BASE64_CONTENT=$(echo "$BASE64_CONTENT" | tr -d '\n')
+
+          # Call the Python script to decode the base64 content and get the test result
+          DECODED_CONTENT=$(python3 decode_base64.py "${PR_NUMBER}" "${BASE64_CONTENT}")
+
+          # Output decoded content and store it in the environment variable
+          echo "Decoded content for PR ${PR_NUMBER}: $DECODED_CONTENT"
+          echo "test_result=${DECODED_CONTENT}" >> $GITHUB_ENV
+      # Step 2: Check if the PR needs to be moved to draft based on the test result
+      - name: Check if the PR needs to be moved to draft
+        run: |
+          if [ "${{ env.test_result }}" == "test-failed" ]; then
+             gh pr comment ${{ env.PR_NUMBER }} --body "❌ Unit/Integration tests failed the PR will be put to DRAFT. Please review the results and fix any issues before proceeding."
+            gh pr ready --undo ${{ env.PR_NUMBER }}
+          else
+            echo "✅ Test passed, Proceeding with E2E tests."
+            # Trigger E2E tests in a new stage
+            echo "test_triggered=true" >> $GITHUB_ENV
+          fi
+
+      # Step 3: Trigger E2E tests
+      - name: Trigger E2E Tests
+        if: env.test_triggered == 'true'
+        run: |
+          echo "Running E2E tests..."
+          pip install pytest
+          pytest e2etests.py
+          if [ $? -eq 0 ]; then
+            echo "✅ E2E tests passed."
+            echo "e2e_test_result=passed" >> $GITHUB_ENV
+          else
+            gh pr comment ${{ env.PR_NUMBER }} --body "❌ E2E tests failed the PR will be put to DRAFT. Please review the results and fix any issues before proceeding."
+            echo "e2e_test_result=failed" >> $GITHUB_ENV
+          fi
+
+
+      # Step 4: Handle E2E test results and Notify Reviewers
+      - name: Handle E2E test results and Notify Reviewers
+        if: env.e2e_test_result == 'passed'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_URL=$(gh pr list --head ${{ github.head_ref }} --state open --json url -q '.[0].url')
+          echo "PR URL: $PR_URL"
+          
+          # Check if PR_URL is set
+          if [ -z "$PR_URL" ]; then
+            echo "❌ No open PR found for the current branch."
+            exit 1
+          fi
+
+          # Add the reviewer to the PR
+          echo "Tests passed, adding reviewer."
+          gh pr edit "$PR_URL" --add-reviewer andreirazvan1998
+
+      - name: Move PR to Draft (if E2E tests failed)
+        if: env.e2e_test_result == 'failed'
+        run: |
+          gh pr comment ${{ env.PR_NUMBER }} --body "❌ E2E tests failed the PR will be put to DRAFT. Please review the results and fix any issues before proceeding."
+          gh pr ready --undo ${{ env.PR_NUMBER }}
