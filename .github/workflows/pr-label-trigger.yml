@@ -62,7 +62,7 @@ jobs:
       - name: Check if the PR needs to be moved to draft
         run: |
           if [ "${{ env.test_result }}" == "test-failed" ]; then
-            echo "❌ Test failed, moving PR to draft."
+             gh pr comment ${{ env.PR_NUMBER }} --body "❌ Unit/Integration tests failed the PR will be put to DRAFT. Please review the results and fix any issues before proceeding."
             gh pr ready --undo ${{ env.PR_NUMBER }}
           else
             echo "✅ Test passed, Proceeding with E2E tests."
@@ -81,7 +81,7 @@ jobs:
             echo "✅ E2E tests passed."
             echo "e2e_test_result=passed" >> $GITHUB_ENV
           else
-            echo "❌ E2E tests failed."
+            gh pr comment ${{ env.PR_NUMBER }} --body "❌ E2E tests failed the PR will be put to DRAFT. Please review the results and fix any issues before proceeding."
             echo "e2e_test_result=failed" >> $GITHUB_ENV
           fi
 
@@ -108,5 +108,5 @@ jobs:
       - name: Move PR to Draft (if E2E tests failed)
         if: env.e2e_test_result == 'failed'
         run: |
-          echo "❌ E2E tests failed, moving PR to draft."
+          gh pr comment ${{ env.PR_NUMBER }} --body "❌ E2E tests failed the PR will be put to DRAFT. Please review the results and fix any issues before proceeding."
           gh pr ready --undo ${{ env.PR_NUMBER }}
